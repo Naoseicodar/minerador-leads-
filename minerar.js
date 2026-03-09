@@ -67,6 +67,13 @@ function sleep(min, max) {
   return new Promise(r => setTimeout(r, ms));
 }
 
+function comTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout global")), ms))
+  ]);
+}
+
 function limpar(txt) {
   if (!txt) return "";
   return String(txt).replace(/["\n\r\t]/g, " ").replace(/\s+/g, " ").trim();
@@ -419,8 +426,8 @@ async function main() {
         const lead = { ...dados, bairro, email: NAO, instagram: NAO };
 
         if (dados.website) {
-          lead.email = await buscarEmailNoSite(dados.website);
-          const html = await httpsGet(dados.website).catch(() => "");
+          lead.email = await comTimeout(buscarEmailNoSite(dados.website), 20000).catch(() => NAO);
+          const html = await comTimeout(httpsGet(dados.website), 8000).catch(() => "");
           lead.instagram = extrairInstagram(html);
           if (lead.email !== NAO) totalEmail++;
           if (lead.instagram !== NAO) totalInsta++;
