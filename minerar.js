@@ -9,6 +9,7 @@ const { google } = require("googleapis");
 const https = require("https");
 const http = require("http");
 const path = require("path");
+const fs = require("fs");
 
 // =============================================
 // CONFIGURACOES
@@ -34,7 +35,27 @@ const CONFIG = {
   delayMin: 300,
   delayMax: 600,
   paginasParalelas: 2,   // páginas simultâneas para visitar places
+  limiteDiario: 150,
 };
+
+const PROGRESSO_PATH = path.join(__dirname, "progresso.json");
+
+function carregarProgresso() {
+  try {
+    const data = JSON.parse(fs.readFileSync(PROGRESSO_PATH, "utf8"));
+    return data.proximoBairro || 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
+function salvarProgresso(proximoBairro) {
+  fs.writeFileSync(PROGRESSO_PATH, JSON.stringify({ proximoBairro }), "utf8");
+}
+
+function limparProgresso() {
+  try { fs.unlinkSync(PROGRESSO_PATH); } catch (_) {}
+}
 
 const NAO = "Não encontrado";
 
@@ -494,12 +515,18 @@ async function main() {
     Array.from({ length: CONFIG.paginasParalelas }, () => criarPagina())
   );
 
+  const inicioBairro = carregarProgresso();
+  if (inicioBairro > 0) {
+    console.log(`  → Retomando do bairro ${CONFIG.bairros[inicioBairro] || "início"} (posição ${inicioBairro})`);
+  }
+
   const chavesVistas = new Set();
   let totalLeads = 0;
   let totalEmail = 0;
   let totalInsta = 0;
+  let limiteAtingido = false;
 
-  for (let i = 0; i < CONFIG.bairros.length; i++) {
+  for (let i = inicioBairro; i < CONFIG.bairros.length; i++) {
     const bairro = CONFIG.bairros[i];
     const prog = `[${String(i + 1).padStart(2, "0")}/${CONFIG.bairros.length}]`;
 
@@ -511,8 +538,13 @@ async function main() {
     const leadsDoLote = [];
     let processados = 0;
 
-    // Processa em lotes usando páginas paralelas
     for (let j = 0; j < links.length; j += CONFIG.paginasParalelas) {
+      const restante = CONFIG.limiteDiario - totalLeads - leadsDoLote.length;
+      if (restante <= 0) {
+        limiteAtingido = true;
+        break;
+      }
+
       const bloco = links.slice(j, j + CONFIG.paginasParalelas);
       const resultados = await Promise.all(
         bloco.map((link, idx) => processarLink(pagesParalelas[idx], link, bairro, chavesVistas, chavesExistentes))
@@ -529,16 +561,27 @@ async function main() {
       process.stdout.write(`\r  ${prog} ${bairro}: ${processados}/${links.length} | novos: ${leadsDoLote.length}        `);
     }
 
-    // Escreve todos os leads do bairro de uma vez
     await appendLote(sheets, leadsDoLote);
     totalLeads += leadsDoLote.length;
 
     process.stdout.write(`\r  ${prog} ${bairro}: ${leadsDoLote.length} leads salvos ✓                          `);
+
+    if (limiteAtingido) {
+      salvarProgresso(i); // retoma neste mesmo bairro amanhã
+      console.log(`\n\n  ⚠ Limite de ${CONFIG.limiteDiario} leads atingido.`);
+      console.log(`  → Retomará amanhã a partir de: ${bairro}`);
+      break;
+    }
+  }
+
+  if (!limiteAtingido) {
+    limparProgresso();
+    console.log("\n\n  ✓ Todos os bairros concluídos. Progresso resetado.");
   }
 
   await browser.close();
 
-  console.log("\n\n  ══════════════════════════════════════");
+  console.log("\n  ══════════════════════════════════════");
   console.log(`  ✓ Total de leads:   ${totalLeads}`);
   console.log(`  ✓ Com email:        ${totalEmail}`);
   console.log(`  ✓ Com Instagram:    ${totalInsta}`);

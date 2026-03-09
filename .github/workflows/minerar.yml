@@ -14,6 +14,13 @@ jobs:
       - name: Checkout do repositório
         uses: actions/checkout@v4
 
+      - name: Restaurar progresso salvo
+        uses: actions/cache@v4
+        with:
+          path: progresso.json
+          key: progresso-minerador
+          restore-keys: progresso-minerador
+
       - name: Configurar Node.js
         uses: actions/setup-node@v4
         with:
@@ -31,3 +38,10 @@ jobs:
 
       - name: Executar minerador
         run: node minerar.js
+
+      - name: Salvar progresso para próxima execução
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: progresso.json
+          key: progresso-minerador
