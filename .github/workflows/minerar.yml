@@ -1,0 +1,33 @@
+name: Minerador de Leads
+
+on:
+  schedule:
+    - cron: '0 11 * * *'  # Todo dia às 08:00 horário de Brasília (UTC-3)
+  workflow_dispatch:        # Permite rodar manualmente pelo GitHub
+
+jobs:
+  minerar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Instalar Chromium + dependências do sistema
+        run: npx playwright install chromium --with-deps
+
+      - name: Criar credentials.json a partir do secret
+        run: echo '${{ secrets.GOOGLE_CREDENTIALS }}' > credentials.json
+
+      - name: Executar minerador
+        run: node minerar.js
