@@ -251,6 +251,17 @@ async function garantirCabecalho(sheets) {
             }, index: 2
           }
         },
+        {
+          addBanding: {
+            bandedRange: {
+              range: { sheetId: gid, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: CABECALHO.length },
+              rowProperties: {
+                firstBandColor:  { red: 0.93, green: 0.93, blue: 0.93 },
+                secondBandColor: { red: 0.98, green: 0.98, blue: 0.98 },
+              }
+            }
+          }
+        },
         ...LARGURAS.map((px, i) => ({
           updateDimensionProperties: {
             range: { sheetId: gid, dimension: "COLUMNS", startIndex: i, endIndex: i + 1 },
@@ -262,6 +273,25 @@ async function garantirCabecalho(sheets) {
   });
 
   console.log("  ✓ Planilha configurada");
+}
+
+async function carregarChavesExistentes(sheets) {
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: CONFIG.sheetId,
+    range: `${CONFIG.sheetNome}!A2:D`,
+  }).catch(() => null);
+
+  const chaves = new Set();
+  const rows = res?.data?.values || [];
+  for (const row of rows) {
+    const nome = row[0] || "";
+    const telefone = row[1] || "";
+    const endereco = row[3] || "";
+    if (telefone && telefone !== NAO) chaves.add(telefone.replace(/\D/g, ""));
+    if (nome && endereco) chaves.add(`${nome}|${endereco}`);
+  }
+  console.log(`  → ${chaves.size} leads já existentes carregados`);
+  return chaves;
 }
 
 async function appendLinha(sheets, lead) {
@@ -380,6 +410,7 @@ async function main() {
 
   const sheets = await criarSheets();
   await garantirCabecalho(sheets);
+  const chavesExistentes = await carregarChavesExistentes(sheets);
 
   const browser = await chromium.launch({
     headless: CONFIG.headless,
@@ -419,8 +450,11 @@ async function main() {
         const dados = await extrairDadosPlace(page);
         if (!dados.nome) continue;
 
-        const chave = dados.telefone || `${dados.nome}|${dados.endereco}`;
-        if (chavesVistas.has(chave)) continue;
+        const chaveNome = `${dados.nome}|${dados.endereco}`;
+        const chaveTel = dados.telefone ? dados.telefone.replace(/\D/g, "") : "";
+        const chave = chaveTel || chaveNome;
+
+        if (chavesVistas.has(chave) || chavesExistentes.has(chaveTel) || chavesExistentes.has(chaveNome)) continue;
         chavesVistas.add(chave);
 
         const lead = { ...dados, bairro, email: NAO, instagram: NAO };
