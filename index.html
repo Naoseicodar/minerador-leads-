@@ -62,18 +62,28 @@
     }
     button:hover { background: #2ea043; }
     button:disabled { background: #21262d; color: #8b949e; cursor: not-allowed; }
-    #status {
+    #status, #status-agenda {
       margin-top: 16px;
       padding: 12px;
       border-radius: 6px;
       font-size: 14px;
       display: none;
     }
-    #status.success { background: #0f2a1a; border: 1px solid #238636; color: #3fb950; }
-    #status.error   { background: #2a0f0f; border: 1px solid #da3633; color: #f85149; }
-    #status.info    { background: #0a1628; border: 1px solid #1f6feb; color: #58a6ff; }
+    #status.success, #status-agenda.success { background: #0f2a1a; border: 1px solid #238636; color: #3fb950; }
+    #status.error,   #status-agenda.error   { background: #2a0f0f; border: 1px solid #da3633; color: #f85149; }
+    #status.info,    #status-agenda.info    { background: #0a1628; border: 1px solid #1f6feb; color: #58a6ff; }
     a { color: #58a6ff; }
     .divider { border: none; border-top: 1px solid #30363d; margin: 20px 0 4px; }
+    #btn-agenda { background: #b62324; }
+    #btn-agenda:hover:not(:disabled) { background: #da3633; }
+    #btn-agenda.ativo { background: #1b4332; }
+    #btn-agenda.ativo:hover:not(:disabled) { background: #238636; }
+    .agenda-label {
+      font-size: 12px;
+      color: #8b949e;
+      margin-top: 8px;
+      text-align: center;
+    }
   </style>
 </head>
 <body>
@@ -100,23 +110,107 @@
     <button id="btn" onclick="disparar()">Disparar Minerador</button>
 
     <div id="status"></div>
+
+    <hr class="divider" style="margin-top: 24px;">
+
+    <button id="btn-agenda" onclick="toggleAgendamento()" disabled>Carregando agendamento...</button>
+    <p class="agenda-label">Agendamento diário: todo dia às 08h30 (Brasília)</p>
+
+    <div id="status-agenda"></div>
   </div>
 
   <script>
     const REPO = 'Naoseicodar/minerador-leads-';
     const WORKFLOW = 'minerador.yml';
 
-    window.onload = () => {
+    window.onload = async () => {
       const pat = localStorage.getItem('gh_pat');
-      if (pat) document.getElementById('pat').value = pat;
+      if (pat) {
+        document.getElementById('pat').value = pat;
+        await carregarEstadoAgendamento(pat);
+      } else {
+        document.getElementById('btn-agenda').textContent = 'Informe o PAT para gerenciar agendamento';
+      }
     };
 
-    function setStatus(msg, type) {
-      const el = document.getElementById('status');
+    function setStatus(msg, type, id = 'status') {
+      const el = document.getElementById(id);
       el.className = type;
       el.style.display = 'block';
       if (type === 'success') el.innerHTML = msg;
       else el.textContent = msg;
+    }
+
+    async function carregarEstadoAgendamento(pat) {
+      const btn = document.getElementById('btn-agenda');
+      try {
+        const res = await fetch(
+          `https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW}`,
+          { headers: { 'Authorization': `Bearer ${pat}`, 'Accept': 'application/vnd.github+json' } }
+        );
+        if (!res.ok) { btn.textContent = 'Erro ao verificar agendamento'; return; }
+        const data = await res.json();
+        atualizarBotaoAgenda(data.state);
+      } catch {
+        btn.textContent = 'Erro de rede';
+      }
+    }
+
+    function atualizarBotaoAgenda(state) {
+      const btn = document.getElementById('btn-agenda');
+      btn.disabled = false;
+      if (state === 'active') {
+        btn.textContent = 'Desativar Agendamento';
+        btn.className = '';
+      } else {
+        btn.textContent = 'Ativar Agendamento';
+        btn.className = 'ativo';
+      }
+    }
+
+    async function toggleAgendamento() {
+      const pat = document.getElementById('pat').value.trim();
+      if (!pat) return setStatus('Informe o GitHub Token (PAT).', 'error', 'status-agenda');
+
+      localStorage.setItem('gh_pat', pat);
+
+      const btn = document.getElementById('btn-agenda');
+      const desativando = btn.textContent.includes('Desativar');
+      const acao = desativando ? 'disable' : 'enable';
+
+      btn.disabled = true;
+      setStatus(desativando ? 'Desativando agendamento...' : 'Ativando agendamento...', 'info', 'status-agenda');
+
+      try {
+        const res = await fetch(
+          `https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW}/${acao}`,
+          {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${pat}`,
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28'
+            }
+          }
+        );
+
+        if (res.status === 204) {
+          const novoEstado = desativando ? 'disabled_manually' : 'active';
+          atualizarBotaoAgenda(novoEstado);
+          setStatus(
+            desativando ? 'Agendamento desativado. O minerador nao vai rodar automaticamente.' : 'Agendamento ativado. O minerador vai rodar todo dia as 08h30.',
+            'success',
+            'status-agenda'
+          );
+        } else {
+          const body = await res.json().catch(() => ({}));
+          setStatus(`Erro ${res.status}: ${body.message || 'Falha'}`, 'error', 'status-agenda');
+          btn.disabled = false;
+        }
+      } catch (e) {
+        setStatus('Erro de rede: ' + e.message, 'error', 'status-agenda');
+        btn.disabled = false;
+      }
     }
 
     async function disparar() {
@@ -131,6 +225,7 @@
       if (!termo)  return setStatus('Informe o termo de busca.', 'error');
 
       localStorage.setItem('gh_pat', pat);
+      carregarEstadoAgendamento(pat);
 
       const btn = document.getElementById('btn');
       btn.disabled = true;
