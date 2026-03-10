@@ -1,0 +1,64 @@
+name: Minerador de Leads
+
+on:
+  schedule:
+    - cron: "30 11 * * *"  # 8h30 horário de Brasília (UTC-3)
+  workflow_dispatch:
+    inputs:
+      cidade:
+        description: "Cidade alvo"
+        required: true
+        default: "Curitiba"
+      termo:
+        description: "Termo de busca (ex: clinica estetica, dentista)"
+        required: true
+        default: "clinica estetica"
+      bairros:
+        description: "Bairros separados por vírgula (deixe vazio para usar os padrões de Curitiba)"
+        required: false
+        default: ""
+      limite_diario:
+        description: "Limite máximo de leads por execução"
+        required: false
+        default: "150"
+
+jobs:
+  minerar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Instalar Playwright (Chromium)
+        run: npx playwright install chromium --with-deps
+
+      - name: Criar credentials.json
+        run: echo '${{ secrets.GOOGLE_CREDENTIALS }}' > credentials.json
+
+      - name: Executar minerador
+        env:
+          CIDADE: ${{ github.event.inputs.cidade }}
+          TERMO: ${{ github.event.inputs.termo }}
+          BAIRROS: ${{ github.event.inputs.bairros }}
+          LIMITE_DIARIO: ${{ github.event.inputs.limite_diario }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+        run: node minerar.js
+
+      - name: Salvar progresso (se houver)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: progresso
+          path: progresso.json
+          if-no-files-found: ignore

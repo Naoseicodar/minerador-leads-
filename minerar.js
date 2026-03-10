@@ -14,28 +14,152 @@ const fs = require("fs");
 // =============================================
 // CONFIGURACOES
 // =============================================
+// Lista de cidades do Paraná em ordem de varredura
+// Quando CIDADE env var não é definida, percorre todas sequencialmente
+const CIDADES_PARANA = [
+  {
+    cidade: "Curitiba",
+    bairros: [
+      "Centro", "Batel", "Agua Verde", "Bigorrilho", "Mercês",
+      "Santa Felicidade", "Boa Vista", "Ahú", "Cabral", "Hugo Lange",
+      "Juvevê", "Champagnat", "Ecoville", "Portão", "Fazendinha",
+      "Pinheirinho", "Sítio Cercado", "CIC", "Cajuru", "Uberaba",
+      "Bacacheri", "Tingui", "Tatuquara", "Xaxim", "Rebouças"
+    ]
+  },
+  {
+    cidade: "Campo Largo",
+    bairros: [
+      "Centro", "Colônia Dom Pedro", "Jardim Primavera", "Vila Nova",
+      "Bairro São João", "Campina das Pedras", "Três Córregos"
+    ]
+  },
+  {
+    cidade: "São José dos Pinhais",
+    bairros: [
+      "Centro", "Colônia Rio Grande", "Afonso Pena", "Guatupê",
+      "Costeira", "Borda do Campo", "Santos Dumont"
+    ]
+  },
+  {
+    cidade: "Araucária",
+    bairros: [
+      "Centro", "Tindiquera", "Thomaz Coelho", "Cachoeira",
+      "Chapada", "Porto das Laranjeiras"
+    ]
+  },
+  {
+    cidade: "Colombo",
+    bairros: [
+      "Centro", "Jardim Bela Vista", "Maracanã", "Guaraituba",
+      "Palmital", "São Gabriel", "Roça Grande"
+    ]
+  },
+  {
+    cidade: "Pinhais",
+    bairros: [
+      "Centro", "Estância Pinhais", "Jardim Claudia", "Weissópolis",
+      "Maria Antonieta", "Emiliano Perneta"
+    ]
+  },
+  {
+    cidade: "Almirante Tamandaré",
+    bairros: [
+      "Centro", "Cachoeira", "Lamenha Pequena", "Tranqueira",
+      "Tigre", "Jardim das Graças"
+    ]
+  },
+  {
+    cidade: "Fazenda Rio Grande",
+    bairros: [
+      "Centro", "Eucaliptos", "Nações", "Iguaçu",
+      "Roseira", "Vale Verde"
+    ]
+  },
+  {
+    cidade: "Ponta Grossa",
+    bairros: [
+      "Centro", "Uvaranas", "Jardim Carvalho", "Oficinas",
+      "Contorno", "Nova Rússia", "Órfãs", "Estrela", "Chapada"
+    ]
+  },
+  {
+    cidade: "Londrina",
+    bairros: [
+      "Centro", "Gleba Palhano", "Jardim Shangri-La", "Higienópolis",
+      "Cambezinho", "Cinco Conjuntos", "Cafezal", "Ipiranga", "Warta"
+    ]
+  },
+  {
+    cidade: "Maringá",
+    bairros: [
+      "Centro", "Zona 01", "Zona 02", "Zona 03", "Zona 04",
+      "Zona 05", "Jardim Alvorada", "Jardim Sumaré", "Jardim Novo Horizonte"
+    ]
+  },
+  {
+    cidade: "Cascavel",
+    bairros: [
+      "Centro", "Cascavel Velho", "Zona Norte", "Zona Sul",
+      "Brasília", "Country", "Santa Felicidade", "Universitário"
+    ]
+  },
+  {
+    cidade: "Foz do Iguaçu",
+    bairros: [
+      "Centro", "Porto Meira", "Morumbi", "Três Lagoas",
+      "Campos do Iguaçu", "Carimã", "Villa A"
+    ]
+  },
+  {
+    cidade: "Guarapuava",
+    bairros: [
+      "Centro", "Batel", "Conradinho", "Jordão",
+      "Morro Alto", "Trianon", "Santa Cruz"
+    ]
+  },
+  {
+    cidade: "Paranaguá",
+    bairros: [
+      "Centro", "Rocio", "Vila Itiberê", "Jardim Iguaçu",
+      "Porto Seguro", "Serraria do Rocha"
+    ]
+  },
+  {
+    cidade: "Apucarana",
+    bairros: [
+      "Centro", "Jardim Mônaco", "Nova Esperança", "Recanto Tropical",
+      "Jardim Paraíso", "Vitória Régia"
+    ]
+  },
+  {
+    cidade: "Campo Mourão",
+    bairros: [
+      "Centro", "Jardim Tropical", "Parque das Laranjeiras",
+      "Santa Cruz", "Industrial", "Lar Paraná"
+    ]
+  },
+];
+
 const CONFIG = {
   credenciaisPath: path.join(__dirname, "credentials.json"),
-  sheetId: "1IZTRE-aYZ1kfMe04fClHWc0JUShlQJxgp51I2_JsKlI",
+  sheetId: process.env.SHEET_ID || "1IZTRE-aYZ1kfMe04fClHWc0JUShlQJxgp51I2_JsKlI",
   sheetNome: "Leads",
 
-  termo: "clinica estetica",
-  cidade: "Curitiba",
+  termo: process.env.TERMO || "clinica estetica",
 
-  bairros: [
-    "Centro", "Batel", "Agua Verde", "Bigorrilho", "Mercês",
-    "Santa Felicidade", "Boa Vista", "Ahú", "Cabral", "Hugo Lange",
-    "Juvevê", "Champagnat", "Ecoville", "Portão", "Fazendinha",
-    "Pinheirinho", "Sítio Cercado", "CIC", "Cajuru", "Uberaba",
-    "Bacacheri", "Tingui", "Tatuquara", "Xaxim", "Rebouças"
-  ],
+  // Modo single-city (via env var) ou multi-city (percorre CIDADES_PARANA)
+  cidadeUnica: process.env.CIDADE || null,
+  bairrosUnico: process.env.BAIRROS
+    ? process.env.BAIRROS.split(",").map(b => b.trim()).filter(Boolean)
+    : null,
 
   maxScroll: 6,
   headless: true,
   delayMin: 300,
   delayMax: 600,
-  paginasParalelas: 2,   // páginas simultâneas para visitar places
-  limiteDiario: 150,
+  paginasParalelas: 2,
+  limiteDiario: Number(process.env.LIMITE_DIARIO) || 150,
 };
 
 const PROGRESSO_PATH = path.join(__dirname, "progresso.json");
@@ -43,14 +167,14 @@ const PROGRESSO_PATH = path.join(__dirname, "progresso.json");
 function carregarProgresso() {
   try {
     const data = JSON.parse(fs.readFileSync(PROGRESSO_PATH, "utf8"));
-    return data.proximoBairro || 0;
+    return { cidadeIdx: data.cidadeIdx || 0, bairroIdx: data.bairroIdx || 0 };
   } catch (_) {
-    return 0;
+    return { cidadeIdx: 0, bairroIdx: 0 };
   }
 }
 
-function salvarProgresso(proximoBairro) {
-  fs.writeFileSync(PROGRESSO_PATH, JSON.stringify({ proximoBairro }), "utf8");
+function salvarProgresso(cidadeIdx, bairroIdx) {
+  fs.writeFileSync(PROGRESSO_PATH, JSON.stringify({ cidadeIdx, bairroIdx }), "utf8");
 }
 
 function limparProgresso() {
@@ -243,6 +367,17 @@ async function garantirCabecalho(sheets) {
             fields: "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)"
           }
         },
+        {
+          repeatCell: {
+            range: { sheetId: gid, startRowIndex: 1, endRowIndex: 50000 },
+            cell: {
+              userEnteredFormat: {
+                backgroundColor: { red: 1, green: 1, blue: 1 },
+              }
+            },
+            fields: "userEnteredFormat.backgroundColor"
+          }
+        },
         { updateSheetProperties: { properties: { sheetId: gid, gridProperties: { frozenRowCount: 1 } }, fields: "gridProperties.frozenRowCount" } },
         { setBasicFilter: { filter: { range: { sheetId: gid, startRowIndex: 0, startColumnIndex: 0, endColumnIndex: CABECALHO.length } } } },
         { updateDimensionProperties: { range: { sheetId: gid, dimension: "ROWS", startIndex: 0, endIndex: 1 }, properties: { pixelSize: 38 }, fields: "pixelSize" } },
@@ -287,17 +422,6 @@ async function garantirCabecalho(sheets) {
               ranges: [{ sheetId: gid, startRowIndex: 1, endRowIndex: 50000, startColumnIndex: 0, endColumnIndex: CABECALHO.length }],
               booleanRule: { condition: { type: "TEXT_CONTAINS", values: [{ userEnteredValue: "Em contato" }] }, format: { backgroundColor: { red: 1, green: 0.97, blue: 0.8 } } }
             }, index: 2
-          }
-        },
-        {
-          addBanding: {
-            bandedRange: {
-              range: { sheetId: gid, startRowIndex: 1, startColumnIndex: 0, endColumnIndex: CABECALHO.length },
-              rowProperties: {
-                firstBandColor:  { red: 0.93, green: 0.93, blue: 0.93 },
-                secondBandColor: { red: 0.98, green: 0.98, blue: 0.98 },
-              }
-            }
           }
         },
         ...LARGURAS.map((px, i) => ({
@@ -411,8 +535,8 @@ async function extrairDadosPlace(page) {
   return d;
 }
 
-async function rasparBairro(page, bairro) {
-  const query = encodeURIComponent(`${CONFIG.termo} em ${bairro} ${CONFIG.cidade}`);
+async function rasparBairro(page, bairro, cidade) {
+  const query = encodeURIComponent(`${CONFIG.termo} em ${bairro} ${cidade}`);
   const links = new Set();
 
   await page.goto(`https://www.google.com/maps/search/${query}?hl=pt-BR`, { waitUntil: "domcontentloaded", timeout: 30000 });
@@ -471,13 +595,21 @@ async function processarLink(page, link, bairro, chavesVistas, chavesExistentes)
 // MAIN
 // =============================================
 async function main() {
+  // Determina se roda single-city (env var) ou percorre todas as cidades do PR
+  const listaCidades = CONFIG.cidadeUnica
+    ? [{ cidade: CONFIG.cidadeUnica, bairros: CONFIG.bairrosUnico || ["Centro"] }]
+    : CIDADES_PARANA;
+
+  const totalCidades = listaCidades.length;
+  const totalBairrosGeral = listaCidades.reduce((acc, c) => acc + c.bairros.length, 0);
+
   console.log("\n");
   console.log("  ╔══════════════════════════════════════╗");
   console.log("  ║     MINERADOR DE LEADS               ║");
   console.log("  ║     Google Maps → Google Sheets      ║");
   console.log("  ╚══════════════════════════════════════╝");
-  console.log(`\n  Termo:   ${CONFIG.termo} — ${CONFIG.cidade}`);
-  console.log(`  Bairros: ${CONFIG.bairros.length}\n`);
+  console.log(`\n  Termo:   ${CONFIG.termo}`);
+  console.log(`  Cidades: ${totalCidades} | Bairros total: ${totalBairrosGeral}\n`);
   console.log("  ──────────────────────────────────────");
 
   const sheets = await criarSheets();
@@ -508,16 +640,15 @@ async function main() {
     return pg;
   };
 
-  // Página principal para navegar nos bairros
   const pagePrincipal = await criarPagina();
-  // Páginas paralelas para visitar places
   const pagesParalelas = await Promise.all(
     Array.from({ length: CONFIG.paginasParalelas }, () => criarPagina())
   );
 
-  const inicioBairro = carregarProgresso();
-  if (inicioBairro > 0) {
-    console.log(`  → Retomando do bairro ${CONFIG.bairros[inicioBairro] || "início"} (posição ${inicioBairro})`);
+  const progresso = carregarProgresso();
+  if (progresso.cidadeIdx > 0 || progresso.bairroIdx > 0) {
+    const c = listaCidades[progresso.cidadeIdx];
+    console.log(`  → Retomando: ${c?.cidade || "?"} / ${c?.bairros[progresso.bairroIdx] || "?"}`);
   }
 
   const chavesVistas = new Set();
@@ -526,57 +657,64 @@ async function main() {
   let totalInsta = 0;
   let limiteAtingido = false;
 
-  for (let i = inicioBairro; i < CONFIG.bairros.length; i++) {
-    const bairro = CONFIG.bairros[i];
-    const prog = `[${String(i + 1).padStart(2, "0")}/${CONFIG.bairros.length}]`;
+  outer: for (let ci = progresso.cidadeIdx; ci < listaCidades.length; ci++) {
+    const { cidade, bairros } = listaCidades[ci];
+    const inicioBairro = ci === progresso.cidadeIdx ? progresso.bairroIdx : 0;
 
-    process.stdout.write(`\n  ${prog} ${bairro}: buscando...`);
+    console.log(`\n  ▶ ${cidade.toUpperCase()} (${bairros.length} bairros)`);
 
-    const links = await rasparBairro(pagePrincipal, bairro).catch(() => []);
-    process.stdout.write(` ${links.length} lugares`);
+    for (let i = inicioBairro; i < bairros.length; i++) {
+      const bairro = bairros[i];
+      const prog = `[${String(i + 1).padStart(2, "0")}/${bairros.length}]`;
 
-    const leadsDoLote = [];
-    let processados = 0;
+      process.stdout.write(`\n  ${prog} ${bairro}: buscando...`);
 
-    for (let j = 0; j < links.length; j += CONFIG.paginasParalelas) {
-      const restante = CONFIG.limiteDiario - totalLeads - leadsDoLote.length;
-      if (restante <= 0) {
-        limiteAtingido = true;
-        break;
+      const links = await rasparBairro(pagePrincipal, bairro, cidade).catch(() => []);
+      process.stdout.write(` ${links.length} lugares`);
+
+      const leadsDoLote = [];
+      let processados = 0;
+
+      for (let j = 0; j < links.length; j += CONFIG.paginasParalelas) {
+        const restante = CONFIG.limiteDiario - totalLeads - leadsDoLote.length;
+        if (restante <= 0) {
+          limiteAtingido = true;
+          break;
+        }
+
+        const bloco = links.slice(j, j + CONFIG.paginasParalelas);
+        const resultados = await Promise.all(
+          bloco.map((link, idx) => processarLink(pagesParalelas[idx], link, `${bairro} - ${cidade}`, chavesVistas, chavesExistentes))
+        );
+
+        for (const lead of resultados) {
+          processados++;
+          if (!lead) continue;
+          leadsDoLote.push(lead);
+          if (lead.email !== NAO) totalEmail++;
+          if (lead.instagram !== NAO) totalInsta++;
+        }
+
+        process.stdout.write(`\r  ${prog} ${bairro}: ${processados}/${links.length} | novos: ${leadsDoLote.length}        `);
       }
 
-      const bloco = links.slice(j, j + CONFIG.paginasParalelas);
-      const resultados = await Promise.all(
-        bloco.map((link, idx) => processarLink(pagesParalelas[idx], link, bairro, chavesVistas, chavesExistentes))
-      );
+      await appendLote(sheets, leadsDoLote);
+      totalLeads += leadsDoLote.length;
 
-      for (const lead of resultados) {
-        processados++;
-        if (!lead) continue;
-        leadsDoLote.push(lead);
-        if (lead.email !== NAO) totalEmail++;
-        if (lead.instagram !== NAO) totalInsta++;
+      process.stdout.write(`\r  ${prog} ${bairro}: ${leadsDoLote.length} leads salvos ✓                          `);
+
+      if (limiteAtingido) {
+        salvarProgresso(ci, i);
+        console.log(`\n\n  ⚠ Limite de ${CONFIG.limiteDiario} leads atingido.`);
+        console.log(`  → Retomará amanhã: ${cidade} / ${bairro}`);
+        break outer;
       }
-
-      process.stdout.write(`\r  ${prog} ${bairro}: ${processados}/${links.length} | novos: ${leadsDoLote.length}        `);
-    }
-
-    await appendLote(sheets, leadsDoLote);
-    totalLeads += leadsDoLote.length;
-
-    process.stdout.write(`\r  ${prog} ${bairro}: ${leadsDoLote.length} leads salvos ✓                          `);
-
-    if (limiteAtingido) {
-      salvarProgresso(i); // retoma neste mesmo bairro amanhã
-      console.log(`\n\n  ⚠ Limite de ${CONFIG.limiteDiario} leads atingido.`);
-      console.log(`  → Retomará amanhã a partir de: ${bairro}`);
-      break;
     }
   }
 
   if (!limiteAtingido) {
     limparProgresso();
-    console.log("\n\n  ✓ Todos os bairros concluídos. Progresso resetado.");
+    console.log("\n\n  ✓ Todas as cidades concluídas. Progresso resetado.");
   }
 
   await browser.close();
