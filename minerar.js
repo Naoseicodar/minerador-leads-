@@ -282,9 +282,11 @@ function httpsGet(url) {
 async function buscarSiteInfo(website) {
   if (!website || website === NAO) return { email: NAO, instagram: NAO };
   const base = website.replace(/\/$/, "");
-  const paginas = ["", "/contato", "/contact", "/fale-conosco", "/sobre"];
+  const paginas = [
+    "", "/contato", "/contact", "/fale-conosco", "/sobre",
+    "/sobre-nos", "/quem-somos", "/atendimento", "/agenda", "/home"
+  ];
 
-  // Busca todas as páginas em paralelo
   const resultados = await Promise.allSettled(
     paginas.map(p => comTimeout(httpsGet(base + p), 6000))
   );
@@ -312,6 +314,43 @@ async function buscarSiteInfo(website) {
   }
 
   return { email, instagram };
+}
+
+// Busca Instagram pelo nome da empresa via DuckDuckGo (fallback quando não tem site)
+async function buscarInstagramViaBusca(nome, cidade) {
+  try {
+    const q = encodeURIComponent(`"${nome}" instagram ${cidade}`);
+    const html = await comTimeout(
+      httpsGet(`https://html.duckduckgo.com/html/?q=${q}`),
+      8000
+    );
+    const insta = extrairInstagram(html);
+    return insta !== NAO ? insta : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Busca email na bio do Instagram (perfis públicos expõem dados no HTML)
+async function buscarEmailNoInstagram(instagramUrl) {
+  try {
+    const url = instagramUrl.startsWith("http") ? instagramUrl : `https://${instagramUrl}`;
+    const html = await comTimeout(httpsGet(url), 8000);
+
+    // Tenta mailto primeiro
+    const mailtoMatch = html.match(/href=["']mailto:([^"'?]+)/i);
+    if (mailtoMatch && mailtoMatch[1].includes("@")) return mailtoMatch[1].trim();
+
+    // Tenta extrair do JSON embarcado no HTML do Instagram
+    const jsonMatch = html.match(/"email":"([^"]+@[^"]+)"/);
+    if (jsonMatch) return jsonMatch[1];
+
+    // Tenta regex geral
+    const found = extrairEmail(html);
+    return found || null;
+  } catch (_) {
+    return null;
+  }
 }
 
 // =============================================
@@ -579,10 +618,23 @@ async function processarLink(page, link, bairro, chavesVistas, chavesExistentes)
 
     const lead = { ...dados, bairro, email: NAO, instagram: NAO };
 
+    // Camada 1: busca no site da empresa
     if (dados.website) {
-      const info = await comTimeout(buscarSiteInfo(dados.website), 18000).catch(() => ({ email: NAO, instagram: NAO }));
+      const info = await comTimeout(buscarSiteInfo(dados.website), 20000).catch(() => ({ email: NAO, instagram: NAO }));
       lead.email = info.email;
       lead.instagram = info.instagram;
+    }
+
+    // Camada 2: se não achou Instagram no site → busca via DuckDuckGo
+    if (lead.instagram === NAO) {
+      const instaEncontrado = await buscarInstagramViaBusca(dados.nome, bairro).catch(() => null);
+      if (instaEncontrado) lead.instagram = instaEncontrado;
+    }
+
+    // Camada 3: se achou Instagram mas não achou email → busca email na bio do Instagram
+    if (lead.email === NAO && lead.instagram !== NAO) {
+      const emailInsta = await buscarEmailNoInstagram(lead.instagram).catch(() => null);
+      if (emailInsta) lead.email = emailInsta;
     }
 
     return lead;
