@@ -363,9 +363,10 @@ async function criarSheets() {
 }
 
 async function garantirCabecalho(sheets) {
+  // Lê até Z para detectar qualquer estrutura, antiga ou nova
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: CONFIG.sheetId,
-    range: `${CONFIG.sheetNome}!A1:L1`,
+    range: `${CONFIG.sheetNome}!A1:Z1`,
   }).catch(() => null);
 
   const cabecalhoAtual = res?.data?.values?.[0] || [];
