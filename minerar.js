@@ -368,24 +368,67 @@ async function garantirCabecalho(sheets) {
     range: `${CONFIG.sheetNome}!A1:L1`,
   }).catch(() => null);
 
-  const atual = res?.data?.values?.[0] || [];
-  if (atual[0] === CABECALHO[0] && atual.length === CABECALHO.length) {
-    console.log("  → Planilha pronta");
-    return;
-  }
-
-  await sheets.spreadsheets.values.clear({ spreadsheetId: CONFIG.sheetId, range: CONFIG.sheetNome });
-
+  const cabecalhoAtual = res?.data?.values?.[0] || [];
   const info = await sheets.spreadsheets.get({ spreadsheetId: CONFIG.sheetId });
   const gid = info.data.sheets[0].properties.sheetId;
 
+  // Já está na estrutura nova — só aplica formatação
+  if (cabecalhoAtual[0] === CABECALHO[0] && cabecalhoAtual.length === CABECALHO.length) {
+    console.log("  → Planilha pronta");
+    await aplicarFormatacao(sheets, gid);
+    return;
+  }
+
+  // Detecta estrutura antiga (14 colunas, começa com "Nome da Empresa")
+  const estruturaAntiga = cabecalhoAtual[0] === "Nome da Empresa" && cabecalhoAtual.length === 14;
+  let dadosMigrados = [];
+
+  if (estruturaAntiga) {
+    console.log("  → Estrutura antiga detectada, migrando dados...");
+    const dadosRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: CONFIG.sheetId,
+      range: `${CONFIG.sheetNome}!A2:N`,
+    }).catch(() => null);
+
+    const linhas = dadosRes?.data?.values || [];
+    // Remapeia: antigo[índice] → novo[índice]
+    // Antigo: 0=Nome,1=Tel,2=Site,3=End,4=Bairro,5=CEP,6=Aval,7=NºAval,8=Cat,9=Email,10=Insta,11=Status,12=Data,13=Obs
+    // Novo:   0=Status,1=Nome,2=Tel,3=Email,4=Insta,5=Site,6=End,7=Bairro,8=Aval,9=NºAval,10=Data,11=Obs
+    dadosMigrados = linhas.map(r => [
+      r[11] || "Não contatado",  // Status
+      r[0]  || "",               // Nome
+      r[1]  || "",               // Telefone
+      r[9]  || "",               // Email
+      r[10] || "",               // Instagram
+      r[2]  || "",               // Website
+      r[3]  || "",               // Endereço
+      r[4]  || "",               // Bairro
+      r[6]  || "",               // Avaliação
+      r[7]  || "",               // Nº Avaliações
+      r[12] || "",               // Data
+      r[13] || "",               // Observações
+    ]);
+    console.log(`  → ${dadosMigrados.length} leads serão migrados`);
+  }
+
+  // Limpa e reescreve com nova estrutura + dados migrados
+  await sheets.spreadsheets.values.clear({ spreadsheetId: CONFIG.sheetId, range: CONFIG.sheetNome });
+
+  const novasLinhas = [CABECALHO, ...dadosMigrados];
   await sheets.spreadsheets.values.update({
     spreadsheetId: CONFIG.sheetId,
     range: `${CONFIG.sheetNome}!A1`,
     valueInputOption: "RAW",
-    requestBody: { values: [CABECALHO] },
+    requestBody: { values: novasLinhas },
   });
 
+  if (estruturaAntiga) console.log(`  ✓ ${dadosMigrados.length} leads migrados com sucesso`);
+
+  await aplicarFormatacao(sheets, gid);
+  console.log("  ✓ Planilha configurada");
+}
+
+async function aplicarFormatacao(sheets, gid) {
   await sheets.spreadsheets.batchUpdate({
     spreadsheetId: CONFIG.sheetId,
     requestBody: {
@@ -480,8 +523,6 @@ async function garantirCabecalho(sheets) {
       ]
     }
   });
-
-  console.log("  ✓ Planilha configurada");
 }
 
 async function carregarChavesExistentes(sheets) {
