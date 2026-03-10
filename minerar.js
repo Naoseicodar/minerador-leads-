@@ -184,26 +184,24 @@ function limparProgresso() {
 const NAO = "Não encontrado";
 
 // =============================================
-// CABECALHO (14 colunas)
+// CABECALHO (12 colunas)
 // =============================================
 const CABECALHO = [
-  "Nome da Empresa",      // A
-  "Telefone",             // B
-  "Website",              // C
-  "Endereço",             // D
-  "Bairro",               // E
-  "CEP",                  // F
-  "Avaliação Google ⭐",  // G
-  "Nº Avaliações",        // H
-  "Categoria",            // I
-  "Email",                // J
-  "Instagram",            // K
-  "Status do Lead",       // L
-  "Data da Busca",        // M
-  "Observações",          // N
+  "Status do Lead",       // A  ← primeiro para acompanhamento imediato
+  "Nome da Empresa",      // B
+  "Telefone",             // C
+  "Email",                // D
+  "Instagram",            // E
+  "Website",              // F
+  "Endereço",             // G
+  "Bairro",               // H
+  "Avaliação Google ⭐",  // I
+  "Nº Avaliações",        // J
+  "Data da Busca",        // K
+  "Observações",          // L
 ];
 
-const LARGURAS = [240, 145, 210, 260, 120, 100, 130, 120, 160, 210, 190, 155, 130, 220];
+const LARGURAS = [150, 220, 145, 205, 185, 195, 245, 125, 125, 110, 115, 220];
 
 // =============================================
 // UTILITARIOS
@@ -367,7 +365,7 @@ async function criarSheets() {
 async function garantirCabecalho(sheets) {
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: CONFIG.sheetId,
-    range: `${CONFIG.sheetNome}!A1:N1`,
+    range: `${CONFIG.sheetNome}!A1:L1`,
   }).catch(() => null);
 
   const atual = res?.data?.values?.[0] || [];
@@ -422,7 +420,8 @@ async function garantirCabecalho(sheets) {
         { updateDimensionProperties: { range: { sheetId: gid, dimension: "ROWS", startIndex: 0, endIndex: 1 }, properties: { pixelSize: 38 }, fields: "pixelSize" } },
         {
           setDataValidation: {
-            range: { sheetId: gid, startRowIndex: 1, endRowIndex: 50000, startColumnIndex: 11, endColumnIndex: 12 },
+            // Status do Lead agora é coluna A (index 0)
+            range: { sheetId: gid, startRowIndex: 1, endRowIndex: 50000, startColumnIndex: 0, endColumnIndex: 1 },
             rule: {
               condition: {
                 type: "ONE_OF_LIST",
@@ -439,11 +438,12 @@ async function garantirCabecalho(sheets) {
             }
           }
         },
+        // Cores por status — aplica na linha inteira
         {
           addConditionalFormatRule: {
             rule: {
               ranges: [{ sheetId: gid, startRowIndex: 1, endRowIndex: 50000, startColumnIndex: 0, endColumnIndex: CABECALHO.length }],
-              booleanRule: { condition: { type: "TEXT_CONTAINS", values: [{ userEnteredValue: "Convertido" }] }, format: { backgroundColor: { red: 0.83, green: 0.95, blue: 0.83 } } }
+              booleanRule: { condition: { type: "TEXT_CONTAINS", values: [{ userEnteredValue: "Convertido" }] }, format: { backgroundColor: { red: 0.8, green: 0.94, blue: 0.8 } } }
             }, index: 0
           }
         },
@@ -451,7 +451,7 @@ async function garantirCabecalho(sheets) {
           addConditionalFormatRule: {
             rule: {
               ranges: [{ sheetId: gid, startRowIndex: 1, endRowIndex: 50000, startColumnIndex: 0, endColumnIndex: CABECALHO.length }],
-              booleanRule: { condition: { type: "TEXT_CONTAINS", values: [{ userEnteredValue: "Sem interesse" }] }, format: { backgroundColor: { red: 0.9, green: 0.9, blue: 0.9 } } }
+              booleanRule: { condition: { type: "TEXT_CONTAINS", values: [{ userEnteredValue: "Proposta enviada" }] }, format: { backgroundColor: { red: 0.8, green: 0.9, blue: 1.0 } } }
             }, index: 1
           }
         },
@@ -461,6 +461,14 @@ async function garantirCabecalho(sheets) {
               ranges: [{ sheetId: gid, startRowIndex: 1, endRowIndex: 50000, startColumnIndex: 0, endColumnIndex: CABECALHO.length }],
               booleanRule: { condition: { type: "TEXT_CONTAINS", values: [{ userEnteredValue: "Em contato" }] }, format: { backgroundColor: { red: 1, green: 0.97, blue: 0.8 } } }
             }, index: 2
+          }
+        },
+        {
+          addConditionalFormatRule: {
+            rule: {
+              ranges: [{ sheetId: gid, startRowIndex: 1, endRowIndex: 50000, startColumnIndex: 0, endColumnIndex: CABECALHO.length }],
+              booleanRule: { condition: { type: "TEXT_CONTAINS", values: [{ userEnteredValue: "Sem interesse" }] }, format: { backgroundColor: { red: 0.9, green: 0.9, blue: 0.9 } } }
+            }, index: 3
           }
         },
         ...LARGURAS.map((px, i) => ({
@@ -477,17 +485,18 @@ async function garantirCabecalho(sheets) {
 }
 
 async function carregarChavesExistentes(sheets) {
+  // Nova ordem: A=Status, B=Nome, C=Telefone, D=Email, E=Instagram, F=Website, G=Endereço
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: CONFIG.sheetId,
-    range: `${CONFIG.sheetNome}!A2:D`,
+    range: `${CONFIG.sheetNome}!A2:G`,
   }).catch(() => null);
 
   const chaves = new Set();
   const rows = res?.data?.values || [];
   for (const row of rows) {
-    const nome = row[0] || "";
-    const telefone = row[1] || "";
-    const endereco = row[3] || "";
+    const nome = row[1] || "";
+    const telefone = row[2] || "";
+    const endereco = row[6] || "";
     if (telefone && telefone !== NAO) chaves.add(telefone.replace(/\D/g, ""));
     if (nome && endereco) chaves.add(`${nome}|${endereco}`);
   }
@@ -497,18 +506,16 @@ async function carregarChavesExistentes(sheets) {
 
 function formatarLinha(lead) {
   return [
+    "Não contatado",
     val(lead.nome),
     lead.telefone ? formatarTelefone(lead.telefone) : NAO,
+    val(lead.email),
+    val(lead.instagram),
     val(lead.website),
     val(lead.endereco),
     val(lead.bairro),
-    val(lead.cep),
     lead.avaliacao || NAO,
     lead.reviews || NAO,
-    val(lead.categoria),
-    val(lead.email),
-    val(lead.instagram),
-    "Não contatado",
     new Date().toLocaleDateString("pt-BR"),
     "",
   ];
