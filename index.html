@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minerador de Leads</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0d1117;
+      color: #e6edf3;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 32px;
+      width: 100%;
+      max-width: 480px;
+    }
+    h1 {
+      font-size: 20px;
+      margin-bottom: 24px;
+      color: #58a6ff;
+    }
+    label {
+      display: block;
+      font-size: 13px;
+      color: #8b949e;
+      margin-bottom: 6px;
+      margin-top: 16px;
+    }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e6edf3;
+      font-size: 14px;
+      outline: none;
+    }
+    input:focus { border-color: #58a6ff; }
+    button {
+      width: 100%;
+      margin-top: 24px;
+      padding: 12px;
+      background: #238636;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #2ea043; }
+    button:disabled { background: #21262d; color: #8b949e; cursor: not-allowed; }
+    #status {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      display: none;
+    }
+    #status.success { background: #0f2a1a; border: 1px solid #238636; color: #3fb950; }
+    #status.error   { background: #2a0f0f; border: 1px solid #da3633; color: #f85149; }
+    #status.info    { background: #0a1628; border: 1px solid #1f6feb; color: #58a6ff; }
+    a { color: #58a6ff; }
+    .divider { border: none; border-top: 1px solid #30363d; margin: 20px 0 4px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Minerador de Leads</h1>
+
+    <label for="pat">GitHub Token (PAT)</label>
+    <input type="password" id="pat" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+
+    <hr class="divider">
+
+    <label for="cidade">Cidade</label>
+    <input type="text" id="cidade" placeholder="Curitiba" value="Curitiba">
+
+    <label for="termo">Termo de busca</label>
+    <input type="text" id="termo" placeholder="clinica estetica" value="clinica estetica">
+
+    <label for="bairros">Bairros (separados por vírgula, opcional)</label>
+    <input type="text" id="bairros" placeholder="Centro, Batel, Água Verde">
+
+    <label for="limite">Limite de leads</label>
+    <input type="number" id="limite" placeholder="150" value="150" min="1" max="500">
+
+    <button id="btn" onclick="disparar()">Disparar Minerador</button>
+
+    <div id="status"></div>
+  </div>
+
+  <script>
+    const REPO = 'Naoseicodar/minerador-leads-';
+    const WORKFLOW = 'minerador.yml';
+
+    window.onload = () => {
+      const pat = localStorage.getItem('gh_pat');
+      if (pat) document.getElementById('pat').value = pat;
+    };
+
+    function setStatus(msg, type) {
+      const el = document.getElementById('status');
+      el.className = type;
+      el.style.display = 'block';
+      if (type === 'success') el.innerHTML = msg;
+      else el.textContent = msg;
+    }
+
+    async function disparar() {
+      const pat     = document.getElementById('pat').value.trim();
+      const cidade  = document.getElementById('cidade').value.trim();
+      const termo   = document.getElementById('termo').value.trim();
+      const bairros = document.getElementById('bairros').value.trim();
+      const limite  = document.getElementById('limite').value.trim();
+
+      if (!pat)    return setStatus('Informe o GitHub Token (PAT).', 'error');
+      if (!cidade) return setStatus('Informe a cidade.', 'error');
+      if (!termo)  return setStatus('Informe o termo de busca.', 'error');
+
+      localStorage.setItem('gh_pat', pat);
+
+      const btn = document.getElementById('btn');
+      btn.disabled = true;
+      setStatus('Disparando workflow...', 'info');
+
+      try {
+        const res = await fetch(
+          `https://api.github.com/repos/${REPO}/actions/workflows/${WORKFLOW}/dispatches`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${pat}`,
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              ref: 'master',
+              inputs: { cidade, termo, bairros, limite_diario: limite }
+            })
+          }
+        );
+
+        if (res.status === 204) {
+          setStatus(
+            `Minerador disparado com sucesso! <a href="https://github.com/${REPO}/actions" target="_blank">Acompanhar execução →</a>`,
+            'success'
+          );
+        } else {
+          const body = await res.json().catch(() => ({}));
+          setStatus(`Erro ${res.status}: ${body.message || 'Falha ao disparar'}`, 'error');
+        }
+      } catch (e) {
+        setStatus('Erro de rede: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+</html>
