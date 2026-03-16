@@ -1,7 +1,7 @@
 /**
- * Minerador de Leads — Google Maps + Google Sheets
- * Playwright (gratuito) + googleapis
- * Uso: node minerar-ireland.js
+ * Ireland Trades Lead Miner — Google Maps + Google Sheets
+ * Playwright + googleapis
+ * Usage: node minerar-ireland.js
  */
 
 const { chromium } = require("playwright");
@@ -68,7 +68,7 @@ const CONFIG = {
   limiteDiario: Number(process.env.LIMITE_DIARIO) || 80,
 };
 
-const PROGRESSO_PATH = path.join(__dirname, "progresso.json");
+const PROGRESSO_PATH = path.join(__dirname, "progresso-ireland.json");
 
 function carregarProgresso() {
   try {
@@ -137,14 +137,11 @@ function val(txt) {
 
 function formatarTelefone(raw) {
   if (!raw) return NAO;
-  const d = raw.replace(/\D/g, "");
-  if (d.length === 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
-  if (d.length === 11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
-  return raw;
+  return raw.trim();
 }
 
 // =============================================
-// EMAIL + INSTAGRAM — paralelo, homepage única
+// EMAIL + FACEBOOK — scraping e busca DuckDuckGo
 // =============================================
 function extrairEmail(html) {
   const regex = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
@@ -153,14 +150,6 @@ function extrairEmail(html) {
     "google", "facebook", "bootstrap", "jquery", "wordpress", "amazon"];
   const matches = html.match(regex) || [];
   return matches.find(e => !ignorar.some(i => e.toLowerCase().includes(i))) || "";
-}
-
-function extrairInstagram(html) {
-  const match = html.match(/(?:instagram\.com|instagr\.am)\/([a-zA-Z0-9_.]{2,30})/);
-  if (!match) return NAO;
-  const u = match[1].replace(/\/$/, "");
-  if (["p", "reel", "explore", "stories", "tv"].includes(u)) return NAO;
-  return `instagram.com/${u}`;
 }
 
 function extrairFacebook(html) {
@@ -191,59 +180,6 @@ function httpsGet(url) {
   });
 }
 
-// Busca email e instagram de uma vez, com páginas em paralelo
-async function buscarSiteInfo(website) {
-  if (!website || website === NAO) return { email: NAO, instagram: NAO };
-  const base = website.replace(/\/$/, "");
-  const paginas = [
-    "", "/contato", "/contact", "/fale-conosco", "/sobre",
-    "/sobre-nos", "/quem-somos", "/atendimento", "/agenda", "/home"
-  ];
-
-  const resultados = await Promise.allSettled(
-    paginas.map(p => comTimeout(httpsGet(base + p), 6000))
-  );
-
-  let email = NAO;
-  let instagram = NAO;
-
-  for (const r of resultados) {
-    if (r.status !== "fulfilled" || !r.value) continue;
-    const html = r.value;
-
-    if (instagram === NAO) instagram = extrairInstagram(html);
-
-    if (email === NAO) {
-      const mailtoMatch = html.match(/href=["']mailto:([^"'?]+)/i);
-      if (mailtoMatch && mailtoMatch[1].includes("@")) {
-        email = mailtoMatch[1].trim();
-      } else {
-        const found = extrairEmail(html);
-        if (found) email = found;
-      }
-    }
-
-    if (email !== NAO && instagram !== NAO) break;
-  }
-
-  return { email, instagram };
-}
-
-// Busca Instagram pelo nome da empresa via DuckDuckGo (fallback quando não tem site)
-async function buscarInstagramViaBusca(nome, cidade) {
-  try {
-    const q = encodeURIComponent(`"${nome}" instagram ${cidade}`);
-    const html = await comTimeout(
-      httpsGet(`https://html.duckduckgo.com/html/?q=${q}`),
-      8000
-    );
-    const insta = extrairInstagram(html);
-    return insta !== NAO ? insta : null;
-  } catch (_) {
-    return null;
-  }
-}
-
 async function buscarFacebookViaBusca(nome, cidade) {
   try {
     const q = encodeURIComponent(`"${nome}" facebook ${cidade} Ireland`);
@@ -253,28 +189,6 @@ async function buscarFacebookViaBusca(nome, cidade) {
     );
     const fb = extrairFacebook(html);
     return fb !== NAO ? fb : null;
-  } catch (_) {
-    return null;
-  }
-}
-
-// Busca email na bio do Instagram (perfis públicos expõem dados no HTML)
-async function buscarEmailNoInstagram(instagramUrl) {
-  try {
-    const url = instagramUrl.startsWith("http") ? instagramUrl : `https://${instagramUrl}`;
-    const html = await comTimeout(httpsGet(url), 8000);
-
-    // Tenta mailto primeiro
-    const mailtoMatch = html.match(/href=["']mailto:([^"'?]+)/i);
-    if (mailtoMatch && mailtoMatch[1].includes("@")) return mailtoMatch[1].trim();
-
-    // Tenta extrair do JSON embarcado no HTML do Instagram
-    const jsonMatch = html.match(/"email":"([^"]+@[^"]+)"/);
-    if (jsonMatch) return jsonMatch[1];
-
-    // Tenta regex geral
-    const found = extrairEmail(html);
-    return found || null;
   } catch (_) {
     return null;
   }
@@ -480,7 +394,7 @@ async function aplicarFormatacao(sheets, gid) {
 }
 
 async function carregarChavesExistentes(sheets) {
-  // Nova ordem: A=Status, B=Nome, C=Telefone, D=Email, E=Facebook, F=Website, G=Endereço
+  // Column order: A=Status, B=Name, C=Phone, D=Email, E=Facebook, F=Website, G=Address
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: CONFIG.sheetId,
     range: `${CONFIG.sheetNome}!A2:G`,
@@ -541,7 +455,7 @@ async function fecharCookies(page) {
 }
 
 async function extrairDadosPlace(page) {
-  const d = { nome: "", telefone: "", website: "", endereco: "", cep: "", avaliacao: "", reviews: "", categoria: "" };
+  const d = { nome: "", telefone: "", website: "", endereco: "", avaliacao: "", reviews: "", categoria: "" };
   try {
     d.nome = (await page.locator("h1").first().textContent({ timeout: 4000 }).catch(() => "")).trim();
 
@@ -570,8 +484,6 @@ async function extrairDadosPlace(page) {
     if (await endEl.isVisible({ timeout: 1500 }).catch(() => false)) {
       const lbl = await endEl.getAttribute("aria-label").catch(() => "");
       d.endereco = lbl.replace(/^Endereço:\s*/i, "").replace(/^Address:\s*/i, "").trim();
-      const cm = d.endereco.match(/\d{5}-?\d{3}/);
-      if (cm) d.cep = cm[0];
     }
   } catch (_) {}
   return d;
@@ -655,10 +567,10 @@ async function main() {
   console.log("\n");
   console.log("  ╔══════════════════════════════════════╗");
   console.log("  ║     IRELAND TRADES MINER             ║");
-  console.log("  ║     Negócios SEM site → Sheets       ║");
+  console.log("  ║     Trades with no website → Sheets  ║");
   console.log("  ╚══════════════════════════════════════╝");
-  console.log(`\n  Nicho:   ${CONFIG.termo || "(todos os tipos de negócio)"}`);
-  console.log(`  Filtro:  sem site | >= ${CONFIG.minEstrelas} estrelas | >= ${CONFIG.minAvaliacoes} avaliacoes`);
+  console.log(`\n  Nicho:   ${CONFIG.termo || "(all trade types)"}`);
+  console.log(`  Filtro:  no website | >= ${CONFIG.minEstrelas} stars | >= ${CONFIG.minAvaliacoes} reviews`);
   console.log(`  Cidades: ${totalCidades} | Bairros total: ${totalBairrosGeral}\n`);
   console.log("  ──────────────────────────────────────");
 
