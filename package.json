@@ -11,7 +11,9 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.78.0",
     "googleapis": "^171.4.0",
+    "nodemailer": "^8.0.2",
     "playwright": "^1.58.2"
   }
 }
