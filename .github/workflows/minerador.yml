@@ -12,7 +12,7 @@ on:
       termo:
         description: "Termo de busca (ex: clinica estetica, dentista)"
         required: true
-        default: "clinica estetica"
+        default: "clinica odontologica"
       bairros:
         description: "Bairros separados por vírgula (deixe vazio para usar os padrões de Curitiba)"
         required: false
