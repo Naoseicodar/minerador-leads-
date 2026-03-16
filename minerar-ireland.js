@@ -606,7 +606,7 @@ async function rasparBairro(page, bairro, cidade) {
 }
 
 // Processa um link e retorna o lead ou null
-async function processarLink(page, link, bairro, chavesVistas, chavesExistentes) {
+async function processarLink(page, link, area, chavesVistas, chavesExistentes) {
   try {
     await page.goto(link + "?hl=en", { waitUntil: "domcontentloaded", timeout: 18000 });
     await sleep(CONFIG.delayMin, CONFIG.delayMax);
@@ -630,10 +630,10 @@ async function processarLink(page, link, bairro, chavesVistas, chavesExistentes)
     if (chavesVistas.has(chave) || chavesExistentes.has(chaveTel) || chavesExistentes.has(chaveNome)) return null;
     chavesVistas.add(chave);
 
-    const lead = { ...dados, bairro, mapsLink: link, email: NAO, facebook: NAO };
+    const lead = { ...dados, bairro: area, mapsLink: link, email: NAO, facebook: NAO };
 
     if (lead.facebook === NAO) {
-      const fbEncontrado = await buscarFacebookViaBusca(dados.nome, bairro).catch(() => null);
+      const fbEncontrado = await buscarFacebookViaBusca(dados.nome, area).catch(() => null);
       if (fbEncontrado) lead.facebook = fbEncontrado;
     }
 
