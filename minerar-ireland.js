@@ -1,0 +1,783 @@
+/**
+ * Minerador de Leads — Google Maps + Google Sheets
+ * Playwright (gratuito) + googleapis
+ * Uso: node minerar-ireland.js
+ */
+
+const { chromium } = require("playwright");
+const { google } = require("googleapis");
+const https = require("https");
+const http = require("http");
+const path = require("path");
+const fs = require("fs");
+
+// =============================================
+// CONFIGURACOES
+// =============================================
+const CIDADES_IRELAND = [
+  {
+    cidade: "Dublin",
+    bairros: ["Dublin 1", "Dublin 2", "Dublin 4", "Dublin 6", "Dublin 8", "Tallaght", "Blanchardstown", "Swords"]
+  },
+  {
+    cidade: "Cork",
+    bairros: ["Cork City", "Ballincollig", "Bishopstown"]
+  },
+  {
+    cidade: "Galway",
+    bairros: ["Galway City", "Salthill", "Tuam"]
+  },
+  {
+    cidade: "Limerick",
+    bairros: ["Limerick City", "Castletroy"]
+  },
+  {
+    cidade: "Waterford",
+    bairros: ["Waterford City"]
+  },
+  {
+    cidade: "Kilkenny",
+    bairros: ["Kilkenny City", "Callan"]
+  },
+  {
+    cidade: "Drogheda",
+    bairros: ["Drogheda Town", "Moneymore"]
+  },
+];
+
+const CONFIG = {
+  credenciaisPath: path.join(__dirname, "credentials.json"),
+  sheetId: process.env.SHEET_ID_IRELAND || "",
+  sheetNome: process.env.SHEET_ABA_IRELAND || "Leads-Ireland",
+
+  termo: process.env.TERMO_IRELAND || "plumber",
+
+  // Filtros de qualidade — thresholds baixos pois negócios sem site tendem a ter menos avaliações
+  minEstrelas: Number(process.env.MIN_ESTRELAS) || 3.5,
+  minAvaliacoes: Number(process.env.MIN_AVALIACOES) || 5,
+
+  // Modo single-city desabilitado para Ireland — percorre sempre todas as cidades
+  cidadeUnica: null,
+  bairrosUnico: null,
+
+  maxScroll: 6,
+  headless: true,
+  delayMin: 300,
+  delayMax: 600,
+  paginasParalelas: 2,
+  limiteDiario: Number(process.env.LIMITE_DIARIO) || 80,
+};
+
+const PROGRESSO_PATH = path.join(__dirname, "progresso.json");
+
+function carregarProgresso() {
+  try {
+    const data = JSON.parse(fs.readFileSync(PROGRESSO_PATH, "utf8"));
+    return { cidadeIdx: data.cidadeIdx || 0, bairroIdx: data.bairroIdx || 0 };
+  } catch (_) {
+    return { cidadeIdx: 0, bairroIdx: 0 };
+  }
+}
+
+function salvarProgresso(cidadeIdx, bairroIdx) {
+  fs.writeFileSync(PROGRESSO_PATH, JSON.stringify({ cidadeIdx, bairroIdx }), "utf8");
+}
+
+function limparProgresso() {
+  try { fs.unlinkSync(PROGRESSO_PATH); } catch (_) {}
+}
+
+const NAO = "Não encontrado";
+
+// =============================================
+// CABECALHO (12 colunas)
+// =============================================
+const CABECALHO = [
+  "Status do Lead",       // A  ← primeiro para acompanhamento imediato
+  "Nome da Empresa",      // B
+  "Telefone",             // C
+  "Email",                // D
+  "Facebook",             // E
+  "Website",              // F
+  "Endereço",             // G
+  "City",                 // H
+  "Avaliação Google ⭐",  // I
+  "Nº Avaliações",        // J
+  "Link Maps",            // K
+  "Data da Busca",        // L
+  "Observações",          // M
+];
+
+const LARGURAS = [150, 220, 145, 205, 185, 195, 245, 125, 125, 110, 220, 115, 220];
+
+// =============================================
+// UTILITARIOS
+// =============================================
+function sleep(min, max) {
+  const ms = max ? Math.floor(Math.random() * (max - min) + min) : min;
+  return new Promise(r => setTimeout(r, ms));
+}
+
+function comTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout global")), ms))
+  ]);
+}
+
+function limpar(txt) {
+  if (!txt) return "";
+  return String(txt).replace(/["\n\r\t]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function val(txt) {
+  const v = limpar(txt);
+  return v || NAO;
+}
+
+function formatarTelefone(raw) {
+  if (!raw) return NAO;
+  const d = raw.replace(/\D/g, "");
+  if (d.length === 10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+  if (d.length === 11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+  return raw;
+}
+
+// =============================================
+// EMAIL + INSTAGRAM — paralelo, homepage única
+// =============================================
+function extrairEmail(html) {
+  const regex = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
+  const ignorar = ["sentry", "example", "@email.", "@dominio", "@seu", "@wix", "shopify",
+    "noreply", "no-reply", ".png", ".jpg", ".gif", ".svg", "schema.org",
+    "google", "facebook", "bootstrap", "jquery", "wordpress", "amazon"];
+  const matches = html.match(regex) || [];
+  return matches.find(e => !ignorar.some(i => e.toLowerCase().includes(i))) || "";
+}
+
+function extrairInstagram(html) {
+  const match = html.match(/(?:instagram\.com|instagr\.am)\/([a-zA-Z0-9_.]{2,30})/);
+  if (!match) return NAO;
+  const u = match[1].replace(/\/$/, "");
+  if (["p", "reel", "explore", "stories", "tv"].includes(u)) return NAO;
+  return `instagram.com/${u}`;
+}
+
+function extrairFacebook(html) {
+  const match = html.match(/(?:facebook\.com)\/(?:pages\/)?([a-zA-Z0-9._\-]{3,80})/);
+  if (!match) return NAO;
+  const u = match[1].replace(/\/$/, "");
+  if (["sharer", "share", "login", "groups", "events", "marketplace", "watch", "photo", "video", "ads"].includes(u)) return NAO;
+  return `facebook.com/${u}`;
+}
+
+function httpsGet(url) {
+  return new Promise((resolve, reject) => {
+    const lib = url.startsWith("https") ? https : http;
+    const req = lib.get(url, {
+      headers: { "User-Agent": "Mozilla/5.0", "Accept": "text/html" },
+      timeout: 6000
+    }, res => {
+      if ([301,302,303,307,308].includes(res.statusCode) && res.headers.location) {
+        return httpsGet(res.headers.location).then(resolve).catch(reject);
+      }
+      let data = "";
+      res.setEncoding("utf8");
+      res.on("data", c => { data += c; if (data.length > 200000) req.destroy(); });
+      res.on("end", () => resolve(data));
+    });
+    req.on("error", reject);
+    req.on("timeout", () => { req.destroy(); reject(new Error("Timeout")); });
+  });
+}
+
+// Busca email e instagram de uma vez, com páginas em paralelo
+async function buscarSiteInfo(website) {
+  if (!website || website === NAO) return { email: NAO, instagram: NAO };
+  const base = website.replace(/\/$/, "");
+  const paginas = [
+    "", "/contato", "/contact", "/fale-conosco", "/sobre",
+    "/sobre-nos", "/quem-somos", "/atendimento", "/agenda", "/home"
+  ];
+
+  const resultados = await Promise.allSettled(
+    paginas.map(p => comTimeout(httpsGet(base + p), 6000))
+  );
+
+  let email = NAO;
+  let instagram = NAO;
+
+  for (const r of resultados) {
+    if (r.status !== "fulfilled" || !r.value) continue;
+    const html = r.value;
+
+    if (instagram === NAO) instagram = extrairInstagram(html);
+
+    if (email === NAO) {
+      const mailtoMatch = html.match(/href=["']mailto:([^"'?]+)/i);
+      if (mailtoMatch && mailtoMatch[1].includes("@")) {
+        email = mailtoMatch[1].trim();
+      } else {
+        const found = extrairEmail(html);
+        if (found) email = found;
+      }
+    }
+
+    if (email !== NAO && instagram !== NAO) break;
+  }
+
+  return { email, instagram };
+}
+
+// Busca Instagram pelo nome da empresa via DuckDuckGo (fallback quando não tem site)
+async function buscarInstagramViaBusca(nome, cidade) {
+  try {
+    const q = encodeURIComponent(`"${nome}" instagram ${cidade}`);
+    const html = await comTimeout(
+      httpsGet(`https://html.duckduckgo.com/html/?q=${q}`),
+      8000
+    );
+    const insta = extrairInstagram(html);
+    return insta !== NAO ? insta : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+async function buscarFacebookViaBusca(nome, cidade) {
+  try {
+    const q = encodeURIComponent(`"${nome}" facebook ${cidade} Ireland`);
+    const html = await comTimeout(
+      httpsGet(`https://html.duckduckgo.com/html/?q=${q}`),
+      8000
+    );
+    const fb = extrairFacebook(html);
+    return fb !== NAO ? fb : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Busca email na bio do Instagram (perfis públicos expõem dados no HTML)
+async function buscarEmailNoInstagram(instagramUrl) {
+  try {
+    const url = instagramUrl.startsWith("http") ? instagramUrl : `https://${instagramUrl}`;
+    const html = await comTimeout(httpsGet(url), 8000);
+
+    // Tenta mailto primeiro
+    const mailtoMatch = html.match(/href=["']mailto:([^"'?]+)/i);
+    if (mailtoMatch && mailtoMatch[1].includes("@")) return mailtoMatch[1].trim();
+
+    // Tenta extrair do JSON embarcado no HTML do Instagram
+    const jsonMatch = html.match(/"email":"([^"]+@[^"]+)"/);
+    if (jsonMatch) return jsonMatch[1];
+
+    // Tenta regex geral
+    const found = extrairEmail(html);
+    return found || null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// =============================================
+// GOOGLE SHEETS
+// =============================================
+async function criarSheets() {
+  const auth = new google.auth.GoogleAuth({
+    keyFile: CONFIG.credenciaisPath,
+    scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+  });
+  return google.sheets({ version: "v4", auth });
+}
+
+async function garantirCabecalho(sheets) {
+  // Lê até Z para detectar qualquer estrutura, antiga ou nova
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: CONFIG.sheetId,
+    range: `${CONFIG.sheetNome}!A1:Z1`,
+  }).catch(() => null);
+
+  const cabecalhoAtual = res?.data?.values?.[0] || [];
+  const info = await sheets.spreadsheets.get({ spreadsheetId: CONFIG.sheetId });
+  const gid = info.data.sheets[0].properties.sheetId;
+
+  // Já está na estrutura nova — só aplica formatação
+  if (cabecalhoAtual[0] === CABECALHO[0] && cabecalhoAtual.length === CABECALHO.length) {
+    console.log("  → Planilha pronta");
+    await aplicarFormatacao(sheets, gid);
+    return;
+  }
+
+  // Detecta estrutura antiga (14 colunas, começa com "Nome da Empresa")
+  const estruturaAntiga = cabecalhoAtual[0] === "Nome da Empresa" && cabecalhoAtual.length === 14;
+  // Detecta estrutura v2 sem Link Maps (12 colunas, começa com "Status do Lead")
+  const estruturaV2 = cabecalhoAtual[0] === "Status do Lead" && cabecalhoAtual.length === 12;
+  let dadosMigrados = [];
+
+  if (estruturaAntiga) {
+    console.log("  → Estrutura antiga detectada, migrando dados...");
+    const dadosRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: CONFIG.sheetId,
+      range: `${CONFIG.sheetNome}!A2:N`,
+    }).catch(() => null);
+
+    const linhas = dadosRes?.data?.values || [];
+    dadosMigrados = linhas.map(r => [
+      r[11] || "Not Contacted",  // Status
+      r[0]  || "",               // Nome
+      r[1]  || "",               // Telefone
+      r[9]  || "",               // Email
+      r[10] || "",               // Facebook
+      r[2]  || "",               // Website
+      r[3]  || "",               // Endereço
+      r[4]  || "",               // City
+      r[6]  || "",               // Avaliação
+      r[7]  || "",               // Nº Avaliações
+      "",                        // Link Maps (novo)
+      r[12] || "",               // Data
+      r[13] || "",               // Observações
+    ]);
+    console.log(`  → ${dadosMigrados.length} leads serão migrados`);
+  } else if (estruturaV2) {
+    console.log("  → Estrutura v2 detectada, adicionando coluna Link Maps...");
+    const dadosRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: CONFIG.sheetId,
+      range: `${CONFIG.sheetNome}!A2:L`,
+    }).catch(() => null);
+
+    const linhas = dadosRes?.data?.values || [];
+    dadosMigrados = linhas.map(r => [
+      r[0]  || "Not Contacted",  // Status
+      r[1]  || "",               // Nome
+      r[2]  || "",               // Telefone
+      r[3]  || "",               // Email
+      r[4]  || "",               // Facebook
+      r[5]  || "",               // Website
+      r[6]  || "",               // Endereço
+      r[7]  || "",               // City
+      r[8]  || "",               // Avaliação
+      r[9]  || "",               // Nº Avaliações
+      "",                        // Link Maps (novo)
+      r[10] || "",               // Data
+      r[11] || "",               // Observações
+    ]);
+    console.log(`  → ${dadosMigrados.length} leads serão migrados`);
+  }
+
+  // Limpa e reescreve com nova estrutura + dados migrados
+  await sheets.spreadsheets.values.clear({ spreadsheetId: CONFIG.sheetId, range: CONFIG.sheetNome });
+
+  const novasLinhas = [CABECALHO, ...dadosMigrados];
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: CONFIG.sheetId,
+    range: `${CONFIG.sheetNome}!A1`,
+    valueInputOption: "RAW",
+    requestBody: { values: novasLinhas },
+  });
+
+  if (estruturaAntiga || estruturaV2) console.log(`  ✓ ${dadosMigrados.length} leads migrados com sucesso`);
+
+  await aplicarFormatacao(sheets, gid);
+  console.log("  ✓ Planilha configurada");
+}
+
+async function aplicarFormatacao(sheets, gid) {
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: CONFIG.sheetId,
+    requestBody: {
+      requests: [
+        {
+          repeatCell: {
+            range: { sheetId: gid, startRowIndex: 0, endRowIndex: 1 },
+            cell: {
+              userEnteredFormat: {
+                backgroundColor: { red: 0.13, green: 0.27, blue: 0.53 },
+                textFormat: { bold: true, fontSize: 10, foregroundColor: { red: 1, green: 1, blue: 1 } },
+                horizontalAlignment: "CENTER",
+                verticalAlignment: "MIDDLE",
+              }
+            },
+            fields: "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)"
+          }
+        },
+        {
+          repeatCell: {
+            range: { sheetId: gid, startRowIndex: 1, endRowIndex: 50000 },
+            cell: {
+              userEnteredFormat: {
+                backgroundColor: { red: 1, green: 1, blue: 1 },
+              }
+            },
+            fields: "userEnteredFormat.backgroundColor"
+          }
+        },
+        { updateSheetProperties: { properties: { sheetId: gid, gridProperties: { frozenRowCount: 1 } }, fields: "gridProperties.frozenRowCount" } },
+        { setBasicFilter: { filter: { range: { sheetId: gid, startRowIndex: 0, startColumnIndex: 0, endColumnIndex: CABECALHO.length } } } },
+        { updateDimensionProperties: { range: { sheetId: gid, dimension: "ROWS", startIndex: 0, endIndex: 1 }, properties: { pixelSize: 38 }, fields: "pixelSize" } },
+        {
+          setDataValidation: {
+            // Status do Lead agora é coluna A (index 0)
+            range: { sheetId: gid, startRowIndex: 1, endRowIndex: 50000, startColumnIndex: 0, endColumnIndex: 1 },
+            rule: {
+              condition: {
+                type: "ONE_OF_LIST",
+                values: [
+                  { userEnteredValue: "Not Contacted" },
+                  { userEnteredValue: "In Contact" },
+                  { userEnteredValue: "Proposal Sent" },
+                  { userEnteredValue: "Converted ✓" },
+                  { userEnteredValue: "Not Interested" },
+                  { userEnteredValue: "No Response" },
+                ]
+              },
+              showCustomUi: true, strict: false
+            }
+          }
+        },
+        // Cores por status — aplica na linha inteira
+        {
+          addConditionalFormatRule: {
+            rule: {
+              ranges: [{ sheetId: gid, startRowIndex: 1, endRowIndex: 50000, startColumnIndex: 0, endColumnIndex: CABECALHO.length }],
+              booleanRule: { condition: { type: "TEXT_CONTAINS", values: [{ userEnteredValue: "Converted" }] }, format: { backgroundColor: { red: 0.8, green: 0.94, blue: 0.8 } } }
+            }, index: 0
+          }
+        },
+        {
+          addConditionalFormatRule: {
+            rule: {
+              ranges: [{ sheetId: gid, startRowIndex: 1, endRowIndex: 50000, startColumnIndex: 0, endColumnIndex: CABECALHO.length }],
+              booleanRule: { condition: { type: "TEXT_CONTAINS", values: [{ userEnteredValue: "Proposal Sent" }] }, format: { backgroundColor: { red: 0.8, green: 0.9, blue: 1.0 } } }
+            }, index: 1
+          }
+        },
+        {
+          addConditionalFormatRule: {
+            rule: {
+              ranges: [{ sheetId: gid, startRowIndex: 1, endRowIndex: 50000, startColumnIndex: 0, endColumnIndex: CABECALHO.length }],
+              booleanRule: { condition: { type: "TEXT_CONTAINS", values: [{ userEnteredValue: "In Contact" }] }, format: { backgroundColor: { red: 1, green: 0.97, blue: 0.8 } } }
+            }, index: 2
+          }
+        },
+        {
+          addConditionalFormatRule: {
+            rule: {
+              ranges: [{ sheetId: gid, startRowIndex: 1, endRowIndex: 50000, startColumnIndex: 0, endColumnIndex: CABECALHO.length }],
+              booleanRule: { condition: { type: "TEXT_CONTAINS", values: [{ userEnteredValue: "Not Interested" }] }, format: { backgroundColor: { red: 0.9, green: 0.9, blue: 0.9 } } }
+            }, index: 3
+          }
+        },
+        ...LARGURAS.map((px, i) => ({
+          updateDimensionProperties: {
+            range: { sheetId: gid, dimension: "COLUMNS", startIndex: i, endIndex: i + 1 },
+            properties: { pixelSize: px }, fields: "pixelSize"
+          }
+        })),
+      ]
+    }
+  });
+}
+
+async function carregarChavesExistentes(sheets) {
+  // Nova ordem: A=Status, B=Nome, C=Telefone, D=Email, E=Facebook, F=Website, G=Endereço
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: CONFIG.sheetId,
+    range: `${CONFIG.sheetNome}!A2:G`,
+  }).catch(() => null);
+
+  const chaves = new Set();
+  const rows = res?.data?.values || [];
+  for (const row of rows) {
+    const nome = row[1] || "";
+    const telefone = row[2] || "";
+    const endereco = row[6] || "";
+    if (telefone && telefone !== NAO) chaves.add(telefone.replace(/\D/g, ""));
+    if (nome && endereco) chaves.add(`${nome}|${endereco}`);
+  }
+  console.log(`  → ${chaves.size} leads já existentes carregados`);
+  return chaves;
+}
+
+function formatarLinha(lead) {
+  return [
+    "Not Contacted",
+    val(lead.nome),
+    lead.telefone ? formatarTelefone(lead.telefone) : NAO,
+    val(lead.email),
+    val(lead.facebook),
+    val(lead.website),
+    val(lead.endereco),
+    val(lead.bairro),
+    lead.avaliacao || NAO,
+    lead.reviews || NAO,
+    val(lead.mapsLink),
+    new Date().toLocaleDateString("en-IE"),
+    "",
+  ];
+}
+
+// Escreve lote de leads de uma vez (uma chamada API por bairro)
+async function appendLote(sheets, leads) {
+  if (!leads.length) return;
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: CONFIG.sheetId,
+    range: `${CONFIG.sheetNome}!A1`,
+    valueInputOption: "RAW",
+    insertDataOption: "INSERT_ROWS",
+    requestBody: { values: leads.map(formatarLinha) },
+  });
+}
+
+// =============================================
+// SCRAPER GOOGLE MAPS
+// =============================================
+async function fecharCookies(page) {
+  try {
+    const btn = page.locator('button:has-text("Aceitar tudo"), button:has-text("Accept all")').first();
+    if (await btn.isVisible({ timeout: 2000 })) await btn.click();
+    await sleep(300);
+  } catch (_) {}
+}
+
+async function extrairDadosPlace(page) {
+  const d = { nome: "", telefone: "", website: "", endereco: "", cep: "", avaliacao: "", reviews: "", categoria: "" };
+  try {
+    d.nome = (await page.locator("h1").first().textContent({ timeout: 4000 }).catch(() => "")).trim();
+
+    const ratingLabel = await page.locator('[aria-label*="estrela"], [aria-label*="star"]').first().getAttribute("aria-label", { timeout: 1500 }).catch(() => "");
+    const rm = ratingLabel.match(/[\d,\.]+/);
+    if (rm) d.avaliacao = rm[0].replace(",", ".");
+
+    const reviewLabel = await page.locator('[aria-label*="valiaç"], [aria-label*="review"]').first().getAttribute("aria-label", { timeout: 1500 }).catch(() => "");
+    const rvm = reviewLabel.match(/(\d[\d\.]*)/);
+    if (rvm) d.reviews = rvm[0].replace(/\./g, "");
+
+    d.categoria = await page.locator('button[jsaction*="category"]').first().textContent({ timeout: 1500 }).catch(() => "");
+
+    const phoneEl = page.locator('[data-item-id^="phone"]').first();
+    if (await phoneEl.isVisible({ timeout: 1500 }).catch(() => false)) {
+      const lbl = await phoneEl.getAttribute("aria-label").catch(() => "");
+      d.telefone = lbl.replace(/^Telefone:\s*/i, "").replace(/^Phone:\s*/i, "").trim();
+    }
+
+    const siteEl = page.locator('[data-item-id="authority"]').first();
+    if (await siteEl.isVisible({ timeout: 1500 }).catch(() => false)) {
+      d.website = await siteEl.getAttribute("href").catch(() => "");
+    }
+
+    const endEl = page.locator('[data-item-id="address"]').first();
+    if (await endEl.isVisible({ timeout: 1500 }).catch(() => false)) {
+      const lbl = await endEl.getAttribute("aria-label").catch(() => "");
+      d.endereco = lbl.replace(/^Endereço:\s*/i, "").replace(/^Address:\s*/i, "").trim();
+      const cm = d.endereco.match(/\d{5}-?\d{3}/);
+      if (cm) d.cep = cm[0];
+    }
+  } catch (_) {}
+  return d;
+}
+
+async function rasparBairro(page, bairro, cidade) {
+  const query = CONFIG.termo
+    ? encodeURIComponent(`${CONFIG.termo} in ${bairro} ${cidade} Ireland`)
+    : encodeURIComponent(`${bairro} ${cidade} Ireland`);
+  const links = new Set();
+
+  await page.goto(`https://www.google.com/maps/search/${query}?hl=en`, { waitUntil: "domcontentloaded", timeout: 30000 });
+  await fecharCookies(page);
+
+  const feed = page.locator('div[role="feed"]');
+  await feed.waitFor({ timeout: 15000 }).catch(() => null);
+  await sleep(1000, 1800);
+
+  for (let s = 0; s <= CONFIG.maxScroll; s++) {
+    const hrefs = await page.locator('a[href*="/maps/place/"]').evaluateAll(els => els.map(a => a.href));
+    hrefs.forEach(h => links.add(h.split("?")[0].split("@")[0]));
+
+    if (s < CONFIG.maxScroll) {
+      await feed.evaluate(el => el.scrollBy(0, 1000)).catch(() => page.evaluate(() => window.scrollBy(0, 1000)));
+      await sleep(700, 1100);
+      const fim = await page.locator('text="You\'ve reached the end of the list."').isVisible().catch(() => false);
+      if (fim) break;
+    }
+  }
+
+  return [...links];
+}
+
+// Processa um link e retorna o lead ou null
+async function processarLink(page, link, bairro, chavesVistas, chavesExistentes) {
+  try {
+    await page.goto(link + "?hl=en", { waitUntil: "domcontentloaded", timeout: 18000 });
+    await sleep(CONFIG.delayMin, CONFIG.delayMax);
+
+    const dados = await extrairDadosPlace(page);
+    if (!dados.nome) return null;
+
+    // Só interessa quem NÃO tem site — é exatamente o público-alvo
+    if (dados.website) return null;
+
+    // Filtro de qualidade: minimo de estrelas e avaliacoes
+    const estrelas = parseFloat(dados.avaliacao);
+    const numAvaliacoes = parseInt(dados.reviews);
+    if (isNaN(estrelas) || estrelas < CONFIG.minEstrelas) return null;
+    if (isNaN(numAvaliacoes) || numAvaliacoes < CONFIG.minAvaliacoes) return null;
+
+    const chaveNome = `${dados.nome}|${dados.endereco}`;
+    const chaveTel = dados.telefone ? dados.telefone.replace(/\D/g, "") : "";
+    const chave = chaveTel || chaveNome;
+
+    if (chavesVistas.has(chave) || chavesExistentes.has(chaveTel) || chavesExistentes.has(chaveNome)) return null;
+    chavesVistas.add(chave);
+
+    const lead = { ...dados, bairro, mapsLink: link, email: NAO, facebook: NAO };
+
+    if (lead.facebook === NAO) {
+      const fbEncontrado = await buscarFacebookViaBusca(dados.nome, bairro).catch(() => null);
+      if (fbEncontrado) lead.facebook = fbEncontrado;
+    }
+
+    return lead;
+  } catch (_) {
+    return null;
+  }
+}
+
+// =============================================
+// MAIN
+// =============================================
+async function main() {
+  const listaCidades = CIDADES_IRELAND;
+
+  const totalCidades = listaCidades.length;
+  const totalBairrosGeral = listaCidades.reduce((acc, c) => acc + c.bairros.length, 0);
+
+  console.log("\n");
+  console.log("  ╔══════════════════════════════════════╗");
+  console.log("  ║     IRELAND TRADES MINER             ║");
+  console.log("  ║     Negócios SEM site → Sheets       ║");
+  console.log("  ╚══════════════════════════════════════╝");
+  console.log(`\n  Nicho:   ${CONFIG.termo || "(todos os tipos de negócio)"}`);
+  console.log(`  Filtro:  sem site | >= ${CONFIG.minEstrelas} estrelas | >= ${CONFIG.minAvaliacoes} avaliacoes`);
+  console.log(`  Cidades: ${totalCidades} | Bairros total: ${totalBairrosGeral}\n`);
+  console.log("  ──────────────────────────────────────");
+
+  const sheets = await criarSheets();
+  await garantirCabecalho(sheets);
+  const chavesExistentes = await carregarChavesExistentes(sheets);
+
+  const browser = await chromium.launch({
+    headless: CONFIG.headless,
+    args: [
+      "--no-sandbox",
+      "--disable-blink-features=AutomationControlled",
+      "--lang=en-IE",
+      "--disable-dev-shm-usage",
+      "--disable-extensions",
+      "--disable-background-networking",
+    ]
+  });
+
+  const criarPagina = async () => {
+    const ctx = await browser.newContext({
+      locale: "en-IE",
+      timezoneId: "Europe/Dublin",
+      userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      viewport: { width: 1280, height: 900 }
+    });
+    const pg = await ctx.newPage();
+    await pg.route("**/*.{png,jpg,jpeg,gif,webp,svg,woff,woff2,ttf,eot,css}", r => r.abort());
+    return pg;
+  };
+
+  const pagePrincipal = await criarPagina();
+  const pagesParalelas = await Promise.all(
+    Array.from({ length: CONFIG.paginasParalelas }, () => criarPagina())
+  );
+
+  const progresso = carregarProgresso();
+  if (progresso.cidadeIdx > 0 || progresso.bairroIdx > 0) {
+    const c = listaCidades[progresso.cidadeIdx];
+    console.log(`  → Retomando: ${c?.cidade || "?"} / ${c?.bairros[progresso.bairroIdx] || "?"}`);
+  }
+
+  const chavesVistas = new Set();
+  let totalLeads = 0;
+  let totalEmail = 0;
+  let totalFacebook = 0;
+  let limiteAtingido = false;
+
+  outer: for (let ci = progresso.cidadeIdx; ci < listaCidades.length; ci++) {
+    const { cidade, bairros } = listaCidades[ci];
+    const inicioBairro = ci === progresso.cidadeIdx ? progresso.bairroIdx : 0;
+
+    console.log(`\n  ▶ ${cidade.toUpperCase()} (${bairros.length} bairros)`);
+
+    for (let i = inicioBairro; i < bairros.length; i++) {
+      const bairro = bairros[i];
+      const prog = `[${String(i + 1).padStart(2, "0")}/${bairros.length}]`;
+
+      process.stdout.write(`\n  ${prog} ${bairro}: buscando...`);
+
+      const links = await rasparBairro(pagePrincipal, bairro, cidade).catch(() => []);
+      process.stdout.write(` ${links.length} lugares`);
+
+      const leadsDoLote = [];
+      let processados = 0;
+
+      for (let j = 0; j < links.length; j += CONFIG.paginasParalelas) {
+        const restante = CONFIG.limiteDiario - totalLeads - leadsDoLote.length;
+        if (restante <= 0) {
+          limiteAtingido = true;
+          break;
+        }
+
+        const bloco = links.slice(j, j + CONFIG.paginasParalelas);
+        const resultados = await Promise.all(
+          bloco.map((link, idx) => processarLink(pagesParalelas[idx], link, cidade, chavesVistas, chavesExistentes))
+        );
+
+        for (const lead of resultados) {
+          processados++;
+          if (!lead) continue;
+          leadsDoLote.push(lead);
+          if (lead.email !== NAO) totalEmail++;
+          if (lead.facebook !== NAO) totalFacebook++;
+        }
+
+        process.stdout.write(`\r  ${prog} ${bairro}: ${processados}/${links.length} | novos: ${leadsDoLote.length}        `);
+      }
+
+      await appendLote(sheets, leadsDoLote);
+      totalLeads += leadsDoLote.length;
+
+      process.stdout.write(`\r  ${prog} ${bairro}: ${leadsDoLote.length} leads salvos ✓                          `);
+
+      if (limiteAtingido) {
+        salvarProgresso(ci, i);
+        console.log(`\n\n  ⚠ Limite de ${CONFIG.limiteDiario} leads atingido.`);
+        console.log(`  → Retomará amanhã: ${cidade} / ${bairro}`);
+        break outer;
+      }
+    }
+  }
+
+  if (!limiteAtingido) {
+    limparProgresso();
+    console.log("\n\n  ✓ Todas as cidades concluídas. Progresso resetado.");
+  }
+
+  await browser.close();
+
+  console.log("\n  ══════════════════════════════════════");
+  console.log(`  ✓ Total de leads:   ${totalLeads}`);
+  console.log(`  ✓ Com email:        ${totalEmail}`);
+  console.log(`  ✓ Com Facebook:     ${totalFacebook}`);
+  console.log(`\n  https://docs.google.com/spreadsheets/d/${CONFIG.sheetId}`);
+  console.log("  ══════════════════════════════════════\n");
+}
+
+main().catch(err => {
+  console.error("\n  ERRO FATAL:", err.message);
+  process.exit(1);
+});
