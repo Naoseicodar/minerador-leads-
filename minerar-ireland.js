@@ -301,18 +301,6 @@ async function buscarEmailViaDuckDuckGo(nome, cidade) {
   return "";
 }
 
-async function buscarEmailGoldenPages(nome, cidade) {
-  try {
-    const q = encodeURIComponent(`${nome} ${cidade}`);
-    const html = await comTimeout(
-      httpsGet(`https://www.goldenpages.ie/q-business+local-where-${encodeURIComponent(cidade)}-adtype-paid-what-${encodeURIComponent(nome)}`),
-      8000
-    );
-    return extrairEmail(html) || "";
-  } catch (_) {
-    return "";
-  }
-}
 
 async function buscarFacebookViaBusca(nome, cidade) {
   try {
@@ -643,7 +631,7 @@ async function aplicarFormatacao(sheets, gid) {
 }
 
 async function carregarChavesExistentes(sheets) {
-  // Column order: A=Status, B=Name, C=Phone, D=Email, E=Facebook, F=Website, G=Address
+  // A=Status B=Nome C=Nicho D=Tel E=Email F=Facebook G=Website H=Rua I=Área J=Cidade
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: CONFIG.sheetId,
     range: `${CONFIG.sheetNome}!A2:J`,
