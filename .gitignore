@@ -1,4 +1,8 @@
 node_modules/
 credentials.json
 progresso.json
+progresso-ireland.json
+instagram-session.json
+.env
+nul
 *.csv

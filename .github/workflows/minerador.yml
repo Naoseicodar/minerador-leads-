@@ -10,11 +10,11 @@ on:
         required: true
         default: "Curitiba"
       termo:
-        description: "Termo de busca (ex: clinica estetica, dentista)"
-        required: true
+        description: "Nicho específico (ex: clinica odontologica, academia) — deixe vazio para todos os tipos"
+        required: false
         default: "clinica odontologica"
       bairros:
-        description: "Bairros separados por vírgula (deixe vazio para usar os padrões de Curitiba)"
+        description: "Bairros separados por vírgula (deixe vazio para usar os padrões da cidade)"
         required: false
         default: ""
       limite_diario:

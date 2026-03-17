@@ -1,0 +1,58 @@
+name: Ireland Business Miner
+
+on:
+  schedule:
+    - cron: "0 8 * * *"  # 8h00 UTC (9h00 Ireland / 5h00 Brasilia)
+  workflow_dispatch:
+    inputs:
+      limite_diario:
+        description: "Limite maximo de leads por execucao"
+        required: false
+        default: "200"
+
+jobs:
+  minerar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Instalar Playwright (Chromium)
+        run: npx playwright install chromium --with-deps
+
+      - name: Criar credentials.json
+        run: echo '${{ secrets.GOOGLE_CREDENTIALS }}' > credentials.json
+
+      - name: Restaurar progresso anterior (se houver)
+        uses: actions/download-artifact@v4
+        with:
+          name: progresso-ireland
+          path: .
+        continue-on-error: true
+
+      - name: Executar minerador Ireland
+        env:
+          SHEET_ID_IRELAND: ${{ secrets.SHEET_ID_IRELAND }}
+          SHEET_ABA_IRELAND: ${{ vars.SHEET_ABA_IRELAND || 'Leads-Ireland' }}
+          LIMITE_DIARIO: ${{ github.event.inputs.limite_diario || '200' }}
+        run: node minerar-ireland.js
+
+      - name: Salvar progresso (se houver)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: progresso-ireland
+          path: progresso-ireland.json
+          if-no-files-found: ignore
+          overwrite: true

@@ -146,7 +146,11 @@ const CONFIG = {
   sheetId: process.env.SHEET_ID || "1IZTRE-aYZ1kfMe04fClHWc0JUShlQJxgp51I2_JsKlI",
   sheetNome: "Leads",
 
-  termo: process.env.TERMO || "clinica estetica",
+  termo: process.env.TERMO || "",
+
+  // Filtros de qualidade — thresholds baixos pois negócios sem site tendem a ter menos avaliações
+  minEstrelas: Number(process.env.MIN_ESTRELAS) || 3.5,
+  minAvaliacoes: Number(process.env.MIN_AVALIACOES) || 5,
 
   // Modo single-city (via env var) ou multi-city (percorre CIDADES_PARANA)
   cidadeUnica: process.env.CIDADE || null,
@@ -197,11 +201,12 @@ const CABECALHO = [
   "Bairro",               // H
   "Avaliação Google ⭐",  // I
   "Nº Avaliações",        // J
-  "Data da Busca",        // K
-  "Observações",          // L
+  "Link Maps",            // K
+  "Data da Busca",        // L
+  "Observações",          // M
 ];
 
-const LARGURAS = [150, 220, 145, 205, 185, 195, 245, 125, 125, 110, 115, 220];
+const LARGURAS = [150, 220, 145, 205, 185, 195, 245, 125, 125, 110, 220, 115, 220];
 
 // =============================================
 // UTILITARIOS
@@ -382,6 +387,8 @@ async function garantirCabecalho(sheets) {
 
   // Detecta estrutura antiga (14 colunas, começa com "Nome da Empresa")
   const estruturaAntiga = cabecalhoAtual[0] === "Nome da Empresa" && cabecalhoAtual.length === 14;
+  // Detecta estrutura v2 sem Link Maps (12 colunas, começa com "Status do Lead")
+  const estruturaV2 = cabecalhoAtual[0] === "Status do Lead" && cabecalhoAtual.length === 12;
   let dadosMigrados = [];
 
   if (estruturaAntiga) {
@@ -394,7 +401,7 @@ async function garantirCabecalho(sheets) {
     const linhas = dadosRes?.data?.values || [];
     // Remapeia: antigo[índice] → novo[índice]
     // Antigo: 0=Nome,1=Tel,2=Site,3=End,4=Bairro,5=CEP,6=Aval,7=NºAval,8=Cat,9=Email,10=Insta,11=Status,12=Data,13=Obs
-    // Novo:   0=Status,1=Nome,2=Tel,3=Email,4=Insta,5=Site,6=End,7=Bairro,8=Aval,9=NºAval,10=Data,11=Obs
+    // Novo:   0=Status,1=Nome,2=Tel,3=Email,4=Insta,5=Site,6=End,7=Bairro,8=Aval,9=NºAval,10=LinkMaps,11=Data,12=Obs
     dadosMigrados = linhas.map(r => [
       r[11] || "Não contatado",  // Status
       r[0]  || "",               // Nome
@@ -406,8 +413,35 @@ async function garantirCabecalho(sheets) {
       r[4]  || "",               // Bairro
       r[6]  || "",               // Avaliação
       r[7]  || "",               // Nº Avaliações
+      "",                        // Link Maps (novo)
       r[12] || "",               // Data
       r[13] || "",               // Observações
+    ]);
+    console.log(`  → ${dadosMigrados.length} leads serão migrados`);
+  } else if (estruturaV2) {
+    console.log("  → Estrutura v2 detectada, adicionando coluna Link Maps...");
+    const dadosRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: CONFIG.sheetId,
+      range: `${CONFIG.sheetNome}!A2:L`,
+    }).catch(() => null);
+
+    const linhas = dadosRes?.data?.values || [];
+    // v2: 0=Status,1=Nome,2=Tel,3=Email,4=Insta,5=Site,6=End,7=Bairro,8=Aval,9=NºAval,10=Data,11=Obs
+    // v3: 0=Status,1=Nome,2=Tel,3=Email,4=Insta,5=Site,6=End,7=Bairro,8=Aval,9=NºAval,10=LinkMaps,11=Data,12=Obs
+    dadosMigrados = linhas.map(r => [
+      r[0]  || "Não contatado",  // Status
+      r[1]  || "",               // Nome
+      r[2]  || "",               // Telefone
+      r[3]  || "",               // Email
+      r[4]  || "",               // Instagram
+      r[5]  || "",               // Website
+      r[6]  || "",               // Endereço
+      r[7]  || "",               // Bairro
+      r[8]  || "",               // Avaliação
+      r[9]  || "",               // Nº Avaliações
+      "",                        // Link Maps (novo)
+      r[10] || "",               // Data
+      r[11] || "",               // Observações
     ]);
     console.log(`  → ${dadosMigrados.length} leads serão migrados`);
   }
@@ -423,7 +457,7 @@ async function garantirCabecalho(sheets) {
     requestBody: { values: novasLinhas },
   });
 
-  if (estruturaAntiga) console.log(`  ✓ ${dadosMigrados.length} leads migrados com sucesso`);
+  if (estruturaAntiga || estruturaV2) console.log(`  ✓ ${dadosMigrados.length} leads migrados com sucesso`);
 
   await aplicarFormatacao(sheets, gid);
   console.log("  ✓ Planilha configurada");
@@ -558,6 +592,7 @@ function formatarLinha(lead) {
     val(lead.bairro),
     lead.avaliacao || NAO,
     lead.reviews || NAO,
+    val(lead.mapsLink),
     new Date().toLocaleDateString("pt-BR"),
     "",
   ];
@@ -624,7 +659,9 @@ async function extrairDadosPlace(page) {
 }
 
 async function rasparBairro(page, bairro, cidade) {
-  const query = encodeURIComponent(`${CONFIG.termo} em ${bairro} ${cidade}`);
+  const query = CONFIG.termo
+    ? encodeURIComponent(`${CONFIG.termo} em ${bairro} ${cidade}`)
+    : encodeURIComponent(`${bairro} ${cidade}`);
   const links = new Set();
 
   await page.goto(`https://www.google.com/maps/search/${query}?hl=pt-BR`, { waitUntil: "domcontentloaded", timeout: 30000 });
@@ -658,6 +695,15 @@ async function processarLink(page, link, bairro, chavesVistas, chavesExistentes)
     const dados = await extrairDadosPlace(page);
     if (!dados.nome) return null;
 
+    // Só interessa quem NÃO tem site — é exatamente o público-alvo
+    if (dados.website) return null;
+
+    // Filtro de qualidade: minimo de estrelas e avaliacoes
+    const estrelas = parseFloat(dados.avaliacao);
+    const numAvaliacoes = parseInt(dados.reviews);
+    if (isNaN(estrelas) || estrelas < CONFIG.minEstrelas) return null;
+    if (isNaN(numAvaliacoes) || numAvaliacoes < CONFIG.minAvaliacoes) return null;
+
     const chaveNome = `${dados.nome}|${dados.endereco}`;
     const chaveTel = dados.telefone ? dados.telefone.replace(/\D/g, "") : "";
     const chave = chaveTel || chaveNome;
@@ -665,7 +711,7 @@ async function processarLink(page, link, bairro, chavesVistas, chavesExistentes)
     if (chavesVistas.has(chave) || chavesExistentes.has(chaveTel) || chavesExistentes.has(chaveNome)) return null;
     chavesVistas.add(chave);
 
-    const lead = { ...dados, bairro, email: NAO, instagram: NAO };
+    const lead = { ...dados, bairro, mapsLink: link, email: NAO, instagram: NAO };
 
     // Camada 1: busca no site da empresa
     if (dados.website) {
@@ -707,9 +753,10 @@ async function main() {
   console.log("\n");
   console.log("  ╔══════════════════════════════════════╗");
   console.log("  ║     MINERADOR DE LEADS               ║");
-  console.log("  ║     Google Maps → Google Sheets      ║");
+  console.log("  ║     Negócios SEM site → Sheets       ║");
   console.log("  ╚══════════════════════════════════════╝");
-  console.log(`\n  Termo:   ${CONFIG.termo}`);
+  console.log(`\n  Nicho:   ${CONFIG.termo || "(todos os tipos de negócio)"}`);
+  console.log(`  Filtro:  sem site | >= ${CONFIG.minEstrelas} estrelas | >= ${CONFIG.minAvaliacoes} avaliacoes`);
   console.log(`  Cidades: ${totalCidades} | Bairros total: ${totalBairrosGeral}\n`);
   console.log("  ──────────────────────────────────────");
 

@@ -1,13 +1,16 @@
 /**
- * Ireland Trades Lead Miner — Google Maps + Google Sheets
+ * Ireland Business Miner — Google Maps + Google Sheets
+ * Todos os tipos de negocio sem website — filtro: >= 4.0 estrelas, >= 20 avaliacoes
  * Playwright + googleapis
  * Usage: node minerar-ireland.js
  */
 
+require("dotenv").config();
 const { chromium } = require("playwright");
 const { google } = require("googleapis");
 const https = require("https");
 const http = require("http");
+const dns = require("dns").promises;
 const path = require("path");
 const fs = require("fs");
 
@@ -50,22 +53,15 @@ const CONFIG = {
   sheetId: process.env.SHEET_ID_IRELAND || "",
   sheetNome: process.env.SHEET_ABA_IRELAND || "Leads-Ireland",
 
-  termo: process.env.TERMO_IRELAND || "plumber",
-
-  // Filtros de qualidade — thresholds baixos pois negócios sem site tendem a ter menos avaliações
-  minEstrelas: Number(process.env.MIN_ESTRELAS) || 3.5,
-  minAvaliacoes: Number(process.env.MIN_AVALIACOES) || 5,
-
-  // Modo single-city desabilitado para Ireland — percorre sempre todas as cidades
-  cidadeUnica: null,
-  bairrosUnico: null,
+  minEstrelas: Number(process.env.MIN_ESTRELAS) || 4.0,
+  minAvaliacoes: Number(process.env.MIN_AVALIACOES) || 20,
 
   maxScroll: 6,
   headless: true,
-  delayMin: 300,
-  delayMax: 600,
-  paginasParalelas: 2,
-  limiteDiario: Number(process.env.LIMITE_DIARIO) || 80,
+  delayMin: 150,
+  delayMax: 300,
+  paginasParalelas: 4,
+  limiteDiario: Number(process.env.LIMITE_DIARIO) || 200,
 };
 
 const PROGRESSO_PATH = path.join(__dirname, "progresso-ireland.json");
@@ -143,13 +139,43 @@ function formatarTelefone(raw) {
 // =============================================
 // EMAIL + FACEBOOK — scraping e busca DuckDuckGo
 // =============================================
+
+// Domínios de diretórios — presença aqui NÃO significa que o negócio tem site próprio
+const DIRETORIOS = [
+  "yelp.com", "goldenpages.ie", "trustpilot.com", "facebook.com", "instagram.com",
+  "linkedin.com", "twitter.com", "x.com", "yellowpages.ie", "businessfinder.ie",
+  "google.com", "maps.google", "ie.trustpilot.com", "cylex.ie", "hotfrog.ie",
+  "local.ie", "brownbook.net", "foursquare.com", "tripadvisor.com", "bark.com",
+  "checkatrade.com", "rated.ie", "ratedpeople.com", "mybuilder.com", "yell.com",
+  "bizify.ie", "kompass.com", "dnb.com", "companieshouse.gov.uk", "vision-net.ie",
+];
+
+function ehDiretorio(url) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    return DIRETORIOS.some(d => host === d || host.endsWith("." + d));
+  } catch (_) {
+    return false;
+  }
+}
+
 function extrairEmail(html) {
   const regex = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g;
   const ignorar = ["sentry", "example", "@email.", "@dominio", "@seu", "@wix", "shopify",
     "noreply", "no-reply", ".png", ".jpg", ".gif", ".svg", "schema.org",
-    "google", "facebook", "bootstrap", "jquery", "wordpress", "amazon"];
+    "google", "facebook", "bootstrap", "jquery", "wordpress", "amazon",
+    "w3.org", "schema", "emailprotected", "yourdomain", "test@", "info@example",
+    "support@", "abuse@", "postmaster@", "webmaster@example",
+    "duckduckgo", "bing.com", "yahoo", "cloudflare", "squarespace",
+    "godaddy", "namecheap", "siteground", "bluehost", "hostgator",
+    "privacy@", "legal@", "dmca@", "spam@", "phishing@"];
   const matches = html.match(regex) || [];
-  return matches.find(e => !ignorar.some(i => e.toLowerCase().includes(i))) || "";
+  const candidatos = matches.filter(e => !ignorar.some(i => e.toLowerCase().includes(i)));
+  // Prefere emails com domínio .ie, depois gmail/hotmail, depois qualquer outro
+  return candidatos.find(e => e.endsWith(".ie"))
+    || candidatos.find(e => e.includes("@gmail") || e.includes("@hotmail") || e.includes("@outlook"))
+    || candidatos[0]
+    || "";
 }
 
 function extrairFacebook(html) {
@@ -180,6 +206,80 @@ function httpsGet(url) {
   });
 }
 
+// Verifica links externos na página do Maps (Web results)
+// Retorna { temSiteProprio: bool, urlDiretorio: string|null }
+async function verificarWebResults(page) {
+  try {
+    // Pega apenas links dentro do painel de informações do negócio
+    // Exclui links de navegação, botões de ação (Call, Directions, Share) e UI do Maps
+    const hrefs = await page.locator('[data-section-id] a[href^="http"], [jslog] a[href^="http"]').evaluateAll(els =>
+      els.map(a => a.href).filter(h =>
+        h.startsWith("http") &&
+        !h.includes("google.com") &&
+        !h.includes("goo.gl") &&
+        !h.includes("maps.app") &&
+        !h.includes("apple.com") &&
+        !h.includes("googleapis.com")
+      )
+    );
+
+    const unicos = [...new Set(hrefs)];
+
+    // Se QUALQUER link não for diretório → negócio tem site próprio
+    const siteProprio = unicos.find(url => !ehDiretorio(url));
+    if (siteProprio) return { temSiteProprio: true, urlDiretorio: null };
+
+    // Todos são diretórios — pega o primeiro para scraping de email
+    // Prioriza Golden Pages (maior diretório da Irlanda)
+    const goldenPages = unicos.find(u => u.includes("goldenpages.ie"));
+    const urlDiretorio = goldenPages || unicos[0] || null;
+
+    return { temSiteProprio: false, urlDiretorio };
+  } catch (_) {
+    return { temSiteProprio: false, urlDiretorio: null };
+  }
+}
+
+async function buscarEmailNoSite(url) {
+  try {
+    const html = await comTimeout(httpsGet(url), 5000);
+    return extrairEmail(html) || "";
+  } catch (_) {
+    return "";
+  }
+}
+
+async function buscarEmailViaDuckDuckGo(nome, cidade) {
+  const queries = [
+    `"${nome}" email ${cidade} Ireland`,
+    `"${nome}" contact ${cidade} Ireland`,
+  ];
+  for (const q of queries) {
+    try {
+      const html = await comTimeout(
+        httpsGet(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`),
+        5000
+      );
+      const email = extrairEmail(html);
+      if (email) return email;
+    } catch (_) {}
+  }
+  return "";
+}
+
+async function buscarEmailGoldenPages(nome, cidade) {
+  try {
+    const q = encodeURIComponent(`${nome} ${cidade}`);
+    const html = await comTimeout(
+      httpsGet(`https://www.goldenpages.ie/q-business+local-where-${encodeURIComponent(cidade)}-adtype-paid-what-${encodeURIComponent(nome)}`),
+      8000
+    );
+    return extrairEmail(html) || "";
+  } catch (_) {
+    return "";
+  }
+}
+
 async function buscarFacebookViaBusca(nome, cidade) {
   try {
     const q = encodeURIComponent(`"${nome}" facebook ${cidade} Ireland`);
@@ -191,6 +291,84 @@ async function buscarFacebookViaBusca(nome, cidade) {
     return fb !== NAO ? fb : null;
   } catch (_) {
     return null;
+  }
+}
+
+// ─── MX Validation ──────────────────────────────────────────
+async function dominioTemMX(dominio) {
+  try {
+    const records = await dns.resolveMx(dominio);
+    return records && records.length > 0;
+  } catch (_) {
+    return false;
+  }
+}
+
+// Extrai domínio de uma URL
+function extrairDominio(url) {
+  try {
+    return new URL(url.startsWith("http") ? url : "https://" + url).hostname.replace(/^www\./, "");
+  } catch (_) {
+    return "";
+  }
+}
+
+// Email guessing: testa padrões comuns dado o nome do negócio e domínio
+// Valida apenas via MX record (não envia nada)
+async function tentarEmailGuessing(nomeBusiness, dominio) {
+  if (!dominio || ehDiretorio("https://" + dominio)) return "";
+  const temMX = await dominioTemMX(dominio).catch(() => false);
+  if (!temMX) return "";
+
+  // Padrões mais comuns para trades na Irlanda
+  const prefixos = ["info", "hello", "contact", "admin", "office"];
+
+  // Tenta extrair first name do nome do negócio (ex: "Murphy Plumbing" → "murphy")
+  const palavras = nomeBusiness.toLowerCase().replace(/[^a-z\s]/g, "").split(/\s+/);
+  const primeiroNome = palavras[0];
+  if (primeiroNome && primeiroNome.length > 2) prefixos.push(primeiroNome);
+
+  // Retorna o primeiro padrão mais provável — info@ é o mais comum para trades
+  // Não verificamos se a caixa existe (SMTP check bloqueado pela maioria)
+  return `info@${dominio}`;
+}
+
+// ─── Bing Search para site próprio ──────────────────────────
+async function buscarSiteViaBing(nome, cidade) {
+  try {
+    // Busca específica por site .ie com nome do negócio
+    const q = encodeURIComponent(`"${nome}" ${cidade} Ireland site:.ie`);
+    const html = await comTimeout(
+      httpsGet(`https://www.bing.com/search?q=${q}&setlang=en-IE&cc=IE`),
+      8000
+    );
+    // Extrai URLs .ie dos resultados
+    const regex = /https?:\/\/(?:www\.)?([a-zA-Z0-9\-]+\.ie)(?:\/[^\s"<]*)?/g;
+    const matches = [...(html.matchAll(regex) || [])].map(m => m[0]);
+    const urlPropria = matches.find(u => !ehDiretorio(u));
+    return urlPropria || "";
+  } catch (_) {
+    return "";
+  }
+}
+
+// ─── Golden Pages Estruturado ────────────────────────────────
+async function buscarGoldenPagesDireto(nome, cidade) {
+  try {
+    // goldenpages.ie tem estrutura de busca por termo + localização
+    const nomeCodificado = encodeURIComponent(nome);
+    const cidadeCodificada = encodeURIComponent(cidade);
+    const url = `https://www.goldenpages.ie/q-business+local-where-${cidadeCodificada}-adtype-paid-what-${nomeCodificado}`;
+    const html = await comTimeout(httpsGet(url), 5000);
+
+    // Tenta extrair email e website da página de resultado
+    const email = extrairEmail(html);
+    const websiteMatch = html.match(/href=["'](https?:\/\/(?!www\.goldenpages)[^"']+)["']/);
+    const website = websiteMatch ? websiteMatch[1] : "";
+
+    return { email, website };
+  } catch (_) {
+    return { email: "", website: "" };
   }
 }
 
@@ -206,6 +384,17 @@ async function criarSheets() {
 }
 
 async function garantirCabecalho(sheets) {
+  // Verifica se a aba existe, cria se não existir
+  const info = await sheets.spreadsheets.get({ spreadsheetId: CONFIG.sheetId });
+  const abaExistente = info.data.sheets.find(s => s.properties.title === CONFIG.sheetNome);
+  if (!abaExistente) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: CONFIG.sheetId,
+      requestBody: { requests: [{ addSheet: { properties: { title: CONFIG.sheetNome } } }] },
+    });
+    console.log(`  → Aba "${CONFIG.sheetNome}" criada`);
+  }
+
   // Lê até Z para detectar qualquer estrutura, antiga ou nova
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: CONFIG.sheetId,
@@ -213,8 +402,9 @@ async function garantirCabecalho(sheets) {
   }).catch(() => null);
 
   const cabecalhoAtual = res?.data?.values?.[0] || [];
-  const info = await sheets.spreadsheets.get({ spreadsheetId: CONFIG.sheetId });
-  const gid = info.data.sheets[0].properties.sheetId;
+  const infoAtual = await sheets.spreadsheets.get({ spreadsheetId: CONFIG.sheetId });
+  const abaInfo = infoAtual.data.sheets.find(s => s.properties.title === CONFIG.sheetNome);
+  const gid = abaInfo ? abaInfo.properties.sheetId : infoAtual.data.sheets[0].properties.sheetId;
 
   // Já está na estrutura nova — só aplica formatação
   if (cabecalhoAtual[0] === CABECALHO[0] && cabecalhoAtual.length === CABECALHO.length) {
@@ -455,7 +645,7 @@ async function fecharCookies(page) {
 }
 
 async function extrairDadosPlace(page) {
-  const d = { nome: "", telefone: "", website: "", endereco: "", avaliacao: "", reviews: "", categoria: "" };
+  const d = { nome: "", telefone: "", website: "", endereco: "", avaliacao: "", reviews: "", categoria: "", emailMaps: "" };
   try {
     d.nome = (await page.locator("h1").first().textContent({ timeout: 4000 }).catch(() => "")).trim();
 
@@ -475,9 +665,19 @@ async function extrairDadosPlace(page) {
       d.telefone = lbl.replace(/^Telefone:\s*/i, "").replace(/^Phone:\s*/i, "").trim();
     }
 
-    const siteEl = page.locator('[data-item-id="authority"]').first();
-    if (await siteEl.isVisible({ timeout: 1500 }).catch(() => false)) {
-      d.website = await siteEl.getAttribute("href").catch(() => "");
+    // Detecta site em múltiplos seletores possíveis
+    const siteSelectors = [
+      '[data-item-id="authority"]',
+      'a[data-value="Website"]',
+      'a[aria-label*="website" i]',
+      'a[aria-label*="Visit" i]',
+    ];
+    for (const sel of siteSelectors) {
+      const el = page.locator(sel).first();
+      if (await el.isVisible({ timeout: 800 }).catch(() => false)) {
+        d.website = await el.getAttribute("href").catch(() => "") || "";
+        if (d.website) break;
+      }
     }
 
     const endEl = page.locator('[data-item-id="address"]').first();
@@ -485,14 +685,17 @@ async function extrairDadosPlace(page) {
       const lbl = await endEl.getAttribute("aria-label").catch(() => "");
       d.endereco = lbl.replace(/^Endereço:\s*/i, "").replace(/^Address:\s*/i, "").trim();
     }
+
+    // Tenta extrair email do texto visível da página (descrição, posts, etc.)
+    const textoVisivel = await page.locator('[data-section-id], [jslog]').first().textContent({ timeout: 1500 }).catch(() => "");
+    if (textoVisivel) d.emailMaps = extrairEmail(textoVisivel);
+
   } catch (_) {}
   return d;
 }
 
 async function rasparBairro(page, bairro, cidade) {
-  const query = CONFIG.termo
-    ? encodeURIComponent(`${CONFIG.termo} in ${bairro} ${cidade} Ireland`)
-    : encodeURIComponent(`${bairro} ${cidade} Ireland`);
+  const query = encodeURIComponent(`businesses in ${bairro} ${cidade} Ireland`);
   const links = new Set();
 
   await page.goto(`https://www.google.com/maps/search/${query}?hl=en`, { waitUntil: "domcontentloaded", timeout: 30000 });
@@ -526,8 +729,13 @@ async function processarLink(page, link, area, chavesVistas, chavesExistentes) {
     const dados = await extrairDadosPlace(page);
     if (!dados.nome) return null;
 
-    // Só interessa quem NÃO tem site — é exatamente o público-alvo
+    // Camada 1: site oficial cadastrado no Maps → descarta
     if (dados.website) return null;
+
+    // Camada 2: verifica Web Results na página
+    // Se encontrar site próprio (não diretório) → o negócio JÁ TEM site → descarta
+    const webResults = await verificarWebResults(page).catch(() => ({ temSiteProprio: false, urlDiretorio: null }));
+    if (webResults.temSiteProprio) return null;
 
     // Filtro de qualidade: minimo de estrelas e avaliacoes
     const estrelas = parseFloat(dados.avaliacao);
@@ -543,7 +751,50 @@ async function processarLink(page, link, area, chavesVistas, chavesExistentes) {
     chavesVistas.add(chave);
 
     const lead = { ...dados, bairro: area, mapsLink: link, email: NAO, facebook: NAO };
+    let dominioEncontrado = "";
 
+    // CAMADA 1: email direto na página do Maps (descrição, posts)
+    if (dados.emailMaps) lead.email = dados.emailMaps;
+
+    // CAMADA 2: diretório nos Web Results → scrapa o diretório
+    if (lead.email === NAO && webResults.urlDiretorio) {
+      const emailDiretorio = await buscarEmailNoSite(webResults.urlDiretorio).catch(() => "");
+      if (emailDiretorio) lead.email = emailDiretorio;
+    }
+
+    // CAMADA 3: Golden Pages estruturado — maior diretório da Irlanda
+    if (lead.email === NAO) {
+      const gp = await buscarGoldenPagesDireto(dados.nome, area).catch(() => ({ email: "", website: "" }));
+      if (gp.email) lead.email = gp.email;
+      // Se encontrou site no Golden Pages, guarda o domínio para email guessing
+      if (gp.website && !dominioEncontrado) dominioEncontrado = extrairDominio(gp.website);
+    }
+
+    // CAMADA 4: Bing busca site .ie próprio não linkado no Maps
+    if (!dominioEncontrado) {
+      const siteViBing = await buscarSiteViaBing(dados.nome, area).catch(() => "");
+      if (siteViBing) {
+        dominioEncontrado = extrairDominio(siteViBing);
+        // Se encontrou site próprio via Bing → negócio TEM site → descarta
+        if (dominioEncontrado && !ehDiretorio("https://" + dominioEncontrado)) {
+          return null;
+        }
+      }
+    }
+
+    // CAMADA 5: Email guessing com MX validation no domínio encontrado
+    if (lead.email === NAO && dominioEncontrado) {
+      const emailGuess = await tentarEmailGuessing(dados.nome, dominioEncontrado).catch(() => "");
+      if (emailGuess) lead.email = emailGuess;
+    }
+
+    // CAMADA 6: DuckDuckGo com múltiplas queries (fallback final)
+    if (lead.email === NAO) {
+      const emailDuck = await buscarEmailViaDuckDuckGo(dados.nome, area).catch(() => "");
+      if (emailDuck) lead.email = emailDuck;
+    }
+
+    // Busca Facebook
     if (lead.facebook === NAO) {
       const fbEncontrado = await buscarFacebookViaBusca(dados.nome, area).catch(() => null);
       if (fbEncontrado) lead.facebook = fbEncontrado;
@@ -560,8 +811,6 @@ async function processarLink(page, link, area, chavesVistas, chavesExistentes) {
 // =============================================
 async function main() {
   const listaCidades = CIDADES_IRELAND;
-
-  const totalCidades = listaCidades.length;
   const totalBairrosGeral = listaCidades.reduce((acc, c) => acc + c.bairros.length, 0);
 
   console.log("\n");
@@ -569,9 +818,8 @@ async function main() {
   console.log("  ║     IRELAND TRADES MINER             ║");
   console.log("  ║     Trades with no website → Sheets  ║");
   console.log("  ╚══════════════════════════════════════╝");
-  console.log(`\n  Nicho:   ${CONFIG.termo || "(all trade types)"}`);
-  console.log(`  Filtro:  no website | >= ${CONFIG.minEstrelas} stars | >= ${CONFIG.minAvaliacoes} reviews`);
-  console.log(`  Cidades: ${totalCidades} | Bairros total: ${totalBairrosGeral}\n`);
+  console.log(`\n  Filtro:  no website | >= ${CONFIG.minEstrelas} stars | >= ${CONFIG.minAvaliacoes} reviews`);
+  console.log(`  Cidades: ${listaCidades.length} | Bairros: ${totalBairrosGeral} | Limite: ${CONFIG.limiteDiario}\n`);
   console.log("  ──────────────────────────────────────");
 
   const sheets = await criarSheets();
@@ -607,25 +855,22 @@ async function main() {
     Array.from({ length: CONFIG.paginasParalelas }, () => criarPagina())
   );
 
-  const progresso = carregarProgresso();
-  if (progresso.cidadeIdx > 0 || progresso.bairroIdx > 0) {
-    const c = listaCidades[progresso.cidadeIdx];
-    console.log(`  → Retomando: ${c?.cidade || "?"} / ${c?.bairros[progresso.bairroIdx] || "?"}`);
-  }
-
   const chavesVistas = new Set();
   let totalLeads = 0;
   let totalEmail = 0;
   let totalFacebook = 0;
   let limiteAtingido = false;
 
-  outer: for (let ci = progresso.cidadeIdx; ci < listaCidades.length; ci++) {
+  const progresso = carregarProgresso();
+  const cidadeInicio = progresso.cidadeIdx || 0;
+
+  mainLoop: for (let ci = cidadeInicio; ci < listaCidades.length; ci++) {
     const { cidade, bairros } = listaCidades[ci];
-    const inicioBairro = ci === progresso.cidadeIdx ? progresso.bairroIdx : 0;
+    const bairroInicio = ci === cidadeInicio ? (progresso.bairroIdx || 0) : 0;
 
-    console.log(`\n  ▶ ${cidade.toUpperCase()} (${bairros.length} bairros)`);
+    console.log(`\n  ▶ ${cidade.toUpperCase()} (${bairros.length} areas)`);
 
-    for (let i = inicioBairro; i < bairros.length; i++) {
+    for (let i = bairroInicio; i < bairros.length; i++) {
       const bairro = bairros[i];
       const prog = `[${String(i + 1).padStart(2, "0")}/${bairros.length}]`;
 
@@ -668,15 +913,15 @@ async function main() {
       if (limiteAtingido) {
         salvarProgresso(ci, i);
         console.log(`\n\n  ⚠ Limite de ${CONFIG.limiteDiario} leads atingido.`);
-        console.log(`  → Retomará amanhã: ${cidade} / ${bairro}`);
-        break outer;
+        console.log(`  → Retomará: ${cidade} / ${bairro}`);
+        break mainLoop;
       }
     }
   }
 
   if (!limiteAtingido) {
     limparProgresso();
-    console.log("\n\n  ✓ Todas as cidades concluídas. Progresso resetado.");
+    console.log("\n\n  ✓ Todas as cidades concluidas. Progresso resetado.");
   }
 
   await browser.close();
