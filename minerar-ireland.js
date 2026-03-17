@@ -48,6 +48,24 @@ const CIDADES_IRELAND = [
   },
 ];
 
+// Nichos por categoria — percorre todos em sequência no mesmo workflow
+const TERMOS_IRELAND = process.env.TERMO_IRELAND
+  ? [process.env.TERMO_IRELAND]
+  : [
+    // Plumbing
+    "plumber", "plumbing service", "heating engineer", "boiler repair",
+    // Electrical
+    "electrician", "electrical contractor", "electrical services",
+    // Construction & Trades
+    "builder", "construction company", "general contractor",
+    "roofer", "roofing contractor",
+    "carpenter", "joinery",
+    "painter decorator",
+    "plasterer",
+    "tiler",
+    "driveway contractor",
+  ];
+
 const CONFIG = {
   credenciaisPath: path.join(__dirname, "credentials.json"),
   sheetId: process.env.SHEET_ID_IRELAND || "",
@@ -69,14 +87,14 @@ const PROGRESSO_PATH = path.join(__dirname, "progresso-ireland.json");
 function carregarProgresso() {
   try {
     const data = JSON.parse(fs.readFileSync(PROGRESSO_PATH, "utf8"));
-    return { cidadeIdx: data.cidadeIdx || 0, bairroIdx: data.bairroIdx || 0 };
+    return { termoIdx: data.termoIdx || 0, cidadeIdx: data.cidadeIdx || 0, bairroIdx: data.bairroIdx || 0 };
   } catch (_) {
-    return { cidadeIdx: 0, bairroIdx: 0 };
+    return { termoIdx: 0, cidadeIdx: 0, bairroIdx: 0 };
   }
 }
 
-function salvarProgresso(cidadeIdx, bairroIdx) {
-  fs.writeFileSync(PROGRESSO_PATH, JSON.stringify({ cidadeIdx, bairroIdx }), "utf8");
+function salvarProgresso(termoIdx, cidadeIdx, bairroIdx) {
+  fs.writeFileSync(PROGRESSO_PATH, JSON.stringify({ termoIdx, cidadeIdx, bairroIdx }), "utf8");
 }
 
 function limparProgresso() {
@@ -97,29 +115,30 @@ const COUNTY_MAP = {
 };
 
 // =============================================
-// CABECALHO (15 colunas)
-// A-F: dados de contato | G: rua (oculta) | H-J: localização | K-O: metricas/meta
+// CABECALHO (16 colunas)
+// A-B: status/nome | C: nicho | D-G: contato | H: rua (oculta) | I-K: localização | L-P: metricas/meta
 // =============================================
 const CABECALHO = [
   "Status do Lead",       // A
   "Nome da Empresa",      // B
-  "Telefone",             // C
-  "Email",                // D
-  "Facebook",             // E
-  "Website",              // F
-  "Rua",                  // G  ← oculta por padrão
-  "Área / Bairro",        // H
-  "Cidade",               // I
-  "County",               // J
-  "Avaliação Google ⭐",  // K
-  "Nº Avaliações",        // L
-  "Link Maps",            // M
-  "Data da Busca",        // N
-  "Observações",          // O
+  "Nicho",                // C  ← categoria do negócio (plumber, electrician, etc.)
+  "Telefone",             // D
+  "Email",                // E
+  "Facebook",             // F
+  "Website",              // G
+  "Rua",                  // H  ← oculta por padrão
+  "Área / Bairro",        // I
+  "Cidade",               // J
+  "County",               // K
+  "Avaliação Google ⭐",  // L
+  "Nº Avaliações",        // M
+  "Link Maps",            // N
+  "Data da Busca",        // O
+  "Observações",          // P
 ];
 
-//                  A    B    C    D    E    F   G(oculta) H    I    J    K    L    M    N    O
-const LARGURAS = [150, 220, 145, 205, 185, 195,   0,      155, 120, 130, 110, 100, 220, 100, 220];
+//                  A    B    C    D    E    F    G   H(oculta)  I    J    K    L    M    N    O    P
+const LARGURAS = [150, 220, 145, 130, 205, 175, 175,   0,      155, 120, 130, 110, 100, 220, 100, 220];
 
 // =============================================
 // UTILITARIOS
@@ -431,8 +450,12 @@ async function garantirCabecalho(sheets) {
   // Detecta versões anteriores da planilha
   const estruturaAntiga  = cabecalhoAtual[0] === "Nome da Empresa"  && cabecalhoAtual.length === 14; // v1
   const estruturaV2      = cabecalhoAtual[0] === "Status do Lead"   && cabecalhoAtual.length === 12; // v2
-  const estruturaV3      = cabecalhoAtual[0] === "Status do Lead"   && cabecalhoAtual.length === 13; // v3 (13 col sem area/city/county separados)
+  const estruturaV3      = cabecalhoAtual[0] === "Status do Lead"   && cabecalhoAtual.length === 13; // v3
+  const estruturaV4      = cabecalhoAtual[0] === "Status do Lead"   && cabecalhoAtual.length === 15; // v4 (sem Nicho)
   let dadosMigrados = [];
+
+  // Função auxiliar: insere "" no índice 2 (Nicho) para migrações que não tinham essa coluna
+  const inserirNicho = (r15) => [r15[0], r15[1], "", ...r15.slice(2)];
 
   if (estruturaAntiga) {
     console.log("  → Estrutura v1 detectada, migrando...");
@@ -444,23 +467,11 @@ async function garantirCabecalho(sheets) {
     const linhas = dadosRes?.data?.values || [];
     dadosMigrados = linhas.map(r => {
       const cidade = r[4] || "";
-      return [
-        r[11] || "Not Contacted",          // A Status
-        r[0]  || "",                        // B Nome
-        r[1]  || "",                        // C Telefone
-        r[9]  || "",                        // D Email
-        r[10] || "",                        // E Facebook
-        r[2]  || "",                        // F Website
-        r[3]  || "",                        // G Rua (endereço completo antigo)
-        "",                                 // H Área
-        cidade,                             // I Cidade
-        COUNTY_MAP[cidade] || "",           // J County
-        r[6]  || "",                        // K Avaliação
-        r[7]  || "",                        // L Nº Avaliações
-        "",                                 // M Link Maps
-        r[12] || "",                        // N Data
-        r[13] || "",                        // O Observações
-      ];
+      return inserirNicho([
+        r[11] || "Not Contacted",  r[0] || "", r[1] || "", r[9] || "", r[10] || "",
+        r[2] || "", r[3] || "", "", cidade, COUNTY_MAP[cidade] || "",
+        r[6] || "", r[7] || "", "", r[12] || "", r[13] || "",
+      ]);
     });
     console.log(`  → ${dadosMigrados.length} leads migrados`);
   } else if (estruturaV2) {
@@ -473,27 +484,15 @@ async function garantirCabecalho(sheets) {
     const linhas = dadosRes?.data?.values || [];
     dadosMigrados = linhas.map(r => {
       const cidade = r[7] || "";
-      return [
-        r[0]  || "Not Contacted",           // A Status
-        r[1]  || "",                         // B Nome
-        r[2]  || "",                         // C Telefone
-        r[3]  || "",                         // D Email
-        r[4]  || "",                         // E Facebook
-        r[5]  || "",                         // F Website
-        r[6]  || "",                         // G Rua
-        "",                                  // H Área
-        cidade,                              // I Cidade
-        COUNTY_MAP[cidade] || "",            // J County
-        r[8]  || "",                         // K Avaliação
-        r[9]  || "",                         // L Nº Avaliações
-        "",                                  // M Link Maps
-        r[10] || "",                         // N Data
-        r[11] || "",                         // O Observações
-      ];
+      return inserirNicho([
+        r[0] || "Not Contacted", r[1] || "", r[2] || "", r[3] || "", r[4] || "",
+        r[5] || "", r[6] || "", "", cidade, COUNTY_MAP[cidade] || "",
+        r[8] || "", r[9] || "", "", r[10] || "", r[11] || "",
+      ]);
     });
     console.log(`  → ${dadosMigrados.length} leads migrados`);
   } else if (estruturaV3) {
-    console.log("  → Estrutura v3 detectada, migrando para v4 (área/cidade/county separados)...");
+    console.log("  → Estrutura v3 detectada, migrando...");
     const dadosRes = await sheets.spreadsheets.values.get({
       spreadsheetId: CONFIG.sheetId,
       range: `${CONFIG.sheetNome}!A2:M`,
@@ -502,24 +501,28 @@ async function garantirCabecalho(sheets) {
     const linhas = dadosRes?.data?.values || [];
     dadosMigrados = linhas.map(r => {
       const cidade = r[7] || "";
-      return [
-        r[0]  || "Not Contacted",           // A Status
-        r[1]  || "",                         // B Nome
-        r[2]  || "",                         // C Telefone
-        r[3]  || "",                         // D Email
-        r[4]  || "",                         // E Facebook
-        r[5]  || "",                         // F Website
-        r[6]  || "",                         // G Rua
-        "",                                  // H Área (não havia antes)
-        cidade,                              // I Cidade (era "City" col H)
-        COUNTY_MAP[cidade] || "",            // J County
-        r[8]  || "",                         // K Avaliação
-        r[9]  || "",                         // L Nº Avaliações
-        r[10] || "",                         // M Link Maps
-        r[11] || "",                         // N Data
-        r[12] || "",                         // O Observações
-      ];
+      return inserirNicho([
+        r[0] || "Not Contacted", r[1] || "", r[2] || "", r[3] || "", r[4] || "",
+        r[5] || "", r[6] || "", "", cidade, COUNTY_MAP[cidade] || "",
+        r[8] || "", r[9] || "", r[10] || "", r[11] || "", r[12] || "",
+      ]);
     });
+    console.log(`  → ${dadosMigrados.length} leads migrados`);
+  } else if (estruturaV4) {
+    console.log("  → Estrutura v4 detectada, adicionando coluna Nicho...");
+    const dadosRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: CONFIG.sheetId,
+      range: `${CONFIG.sheetNome}!A2:O`,
+    }).catch(() => null);
+
+    const linhas = dadosRes?.data?.values || [];
+    // v4: A=Status B=Nome C=Tel D=Email E=FB F=Website G=Rua H=Área I=Cidade J=County K=Aval L=NºAval M=Maps N=Data O=Obs
+    // v5: A=Status B=Nome C=Nicho D=Tel E=Email F=FB G=Website H=Rua I=Área J=Cidade K=County L=Aval M=NºAval N=Maps O=Data P=Obs
+    dadosMigrados = linhas.map(r => inserirNicho([
+      r[0]||"Not Contacted", r[1]||"", r[2]||"", r[3]||"", r[4]||"",
+      r[5]||"", r[6]||"", r[7]||"", r[8]||"", r[9]||"",
+      r[10]||"", r[11]||"", r[12]||"", r[13]||"", r[14]||"",
+    ]));
     console.log(`  → ${dadosMigrados.length} leads migrados`);
   }
 
@@ -573,8 +576,8 @@ async function aplicarFormatacao(sheets, gid) {
         { updateSheetProperties: { properties: { sheetId: gid, gridProperties: { frozenRowCount: 1 } }, fields: "gridProperties.frozenRowCount" } },
         { setBasicFilter: { filter: { range: { sheetId: gid, startRowIndex: 0, startColumnIndex: 0, endColumnIndex: CABECALHO.length } } } },
         { updateDimensionProperties: { range: { sheetId: gid, dimension: "ROWS", startIndex: 0, endIndex: 1 }, properties: { pixelSize: 38 }, fields: "pixelSize" } },
-        // Oculta coluna G (Rua) — index 6
-        { updateDimensionProperties: { range: { sheetId: gid, dimension: "COLUMNS", startIndex: 6, endIndex: 7 }, properties: { hiddenByUser: true }, fields: "hiddenByUser" } },
+        // Oculta coluna H (Rua) — index 7
+        { updateDimensionProperties: { range: { sheetId: gid, dimension: "COLUMNS", startIndex: 7, endIndex: 8 }, properties: { hiddenByUser: true }, fields: "hiddenByUser" } },
         {
           setDataValidation: {
             // Status do Lead agora é coluna A (index 0)
@@ -643,15 +646,15 @@ async function carregarChavesExistentes(sheets) {
   // Column order: A=Status, B=Name, C=Phone, D=Email, E=Facebook, F=Website, G=Address
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: CONFIG.sheetId,
-    range: `${CONFIG.sheetNome}!A2:I`,
+    range: `${CONFIG.sheetNome}!A2:J`,
   }).catch(() => null);
 
   const chaves = new Set();
   const rows = res?.data?.values || [];
   for (const row of rows) {
     const nome     = row[1] || "";
-    const telefone = row[2] || "";
-    const rua      = row[6] || "";
+    const telefone = row[3] || "";  // D
+    const rua      = row[7] || "";  // H
     if (telefone && telefone !== NAO) chaves.add(telefone.replace(/\D/g, ""));
     if (nome && rua) chaves.add(`${nome}|${rua}`);
   }
@@ -663,19 +666,20 @@ function formatarLinha(lead) {
   return [
     "Not Contacted",                                       // A Status
     val(lead.nome),                                        // B Nome
-    lead.telefone ? formatarTelefone(lead.telefone) : NAO, // C Telefone
-    val(lead.email),                                       // D Email
-    val(lead.facebook),                                    // E Facebook
-    val(lead.website),                                     // F Website
-    val(lead.rua),                                         // G Rua (oculta)
-    val(lead.area),                                        // H Área / Bairro
-    val(lead.cidade),                                      // I Cidade
-    val(lead.county),                                      // J County
-    lead.avaliacao || NAO,                                 // K Avaliação
-    lead.reviews || NAO,                                   // L Nº Avaliações
-    val(lead.mapsLink),                                    // M Link Maps
-    new Date().toLocaleDateString("en-IE"),                // N Data
-    "",                                                    // O Observações
+    val(lead.nicho),                                       // C Nicho
+    lead.telefone ? formatarTelefone(lead.telefone) : NAO, // D Telefone
+    val(lead.email),                                       // E Email
+    val(lead.facebook),                                    // F Facebook
+    val(lead.website),                                     // G Website
+    val(lead.rua),                                         // H Rua (oculta)
+    val(lead.area),                                        // I Área / Bairro
+    val(lead.cidade),                                      // J Cidade
+    val(lead.county),                                      // K County
+    lead.avaliacao || NAO,                                 // L Avaliação
+    lead.reviews || NAO,                                   // M Nº Avaliações
+    val(lead.mapsLink),                                    // N Link Maps
+    new Date().toLocaleDateString("en-IE"),                // O Data
+    "",                                                    // P Observações
   ];
 }
 
@@ -752,8 +756,8 @@ async function extrairDadosPlace(page) {
   return d;
 }
 
-async function rasparBairro(page, bairro, cidade) {
-  const query = encodeURIComponent(`businesses in ${bairro} ${cidade} Ireland`);
+async function rasparBairro(page, bairro, cidade, termo) {
+  const query = encodeURIComponent(`${termo} in ${bairro} ${cidade} Ireland`);
   const links = new Set();
 
   await page.goto(`https://www.google.com/maps/search/${query}?hl=en`, { waitUntil: "domcontentloaded", timeout: 30000 });
@@ -779,7 +783,7 @@ async function rasparBairro(page, bairro, cidade) {
 }
 
 // Processa um link e retorna o lead ou null
-async function processarLink(page, link, area, cidade, chavesVistas, chavesExistentes) {
+async function processarLink(page, link, area, cidade, nicho, chavesVistas, chavesExistentes) {
   try {
     await page.goto(link + "?hl=en", { waitUntil: "domcontentloaded", timeout: 18000 });
     await sleep(CONFIG.delayMin, CONFIG.delayMax);
@@ -809,7 +813,7 @@ async function processarLink(page, link, area, cidade, chavesVistas, chavesExist
     chavesVistas.add(chave);
 
     const county = COUNTY_MAP[cidade] || `Co. ${cidade}`;
-    const lead = { ...dados, rua: dados.endereco, area, cidade, county, mapsLink: link, email: NAO, facebook: NAO };
+    const lead = { ...dados, nicho, rua: dados.endereco, area, cidade, county, mapsLink: link, email: NAO, facebook: NAO };
     let dominioEncontrado = "";
 
     // CAMADA 1: email direto na página do Maps (descrição, posts)
@@ -877,7 +881,8 @@ async function main() {
   console.log("  ║     IRELAND TRADES MINER             ║");
   console.log("  ║     Trades with no website → Sheets  ║");
   console.log("  ╚══════════════════════════════════════╝");
-  console.log(`\n  Filtro:  no website | >= ${CONFIG.minEstrelas} stars | >= ${CONFIG.minAvaliacoes} reviews`);
+  console.log(`\n  Nichos:  ${TERMOS_IRELAND.length} termos (plumbing, electrical, construction)`);
+  console.log(`  Filtro:  no website | >= ${CONFIG.minEstrelas} stars | >= ${CONFIG.minAvaliacoes} reviews`);
   console.log(`  Cidades: ${listaCidades.length} | Bairros: ${totalBairrosGeral} | Limite: ${CONFIG.limiteDiario}\n`);
   console.log("  ──────────────────────────────────────");
 
@@ -921,66 +926,75 @@ async function main() {
   let limiteAtingido = false;
 
   const progresso = carregarProgresso();
-  const cidadeInicio = progresso.cidadeIdx || 0;
+  const termoInicio = progresso.termoIdx || 0;
 
-  mainLoop: for (let ci = cidadeInicio; ci < listaCidades.length; ci++) {
-    const { cidade, bairros } = listaCidades[ci];
-    const bairroInicio = ci === cidadeInicio ? (progresso.bairroIdx || 0) : 0;
+  mainLoop: for (let ti = termoInicio; ti < TERMOS_IRELAND.length; ti++) {
+    const termo = TERMOS_IRELAND[ti];
+    console.log(`\n  ════════════════════════════════════`);
+    console.log(`  NICHO: ${termo.toUpperCase()}`);
+    console.log(`  ════════════════════════════════════`);
 
-    console.log(`\n  ▶ ${cidade.toUpperCase()} (${bairros.length} areas)`);
+    const cidadeInicio = ti === termoInicio ? (progresso.cidadeIdx || 0) : 0;
 
-    for (let i = bairroInicio; i < bairros.length; i++) {
-      const bairro = bairros[i];
-      const prog = `[${String(i + 1).padStart(2, "0")}/${bairros.length}]`;
+    for (let ci = cidadeInicio; ci < listaCidades.length; ci++) {
+      const { cidade, bairros } = listaCidades[ci];
+      const bairroInicio = (ti === termoInicio && ci === cidadeInicio) ? (progresso.bairroIdx || 0) : 0;
 
-      process.stdout.write(`\n  ${prog} ${bairro}: buscando...`);
+      console.log(`\n  ▶ ${cidade.toUpperCase()} (${bairros.length} areas)`);
 
-      const links = await rasparBairro(pagePrincipal, bairro, cidade).catch(() => []);
-      process.stdout.write(` ${links.length} lugares`);
+      for (let i = bairroInicio; i < bairros.length; i++) {
+        const bairro = bairros[i];
+        const prog = `[${String(i + 1).padStart(2, "0")}/${bairros.length}]`;
 
-      const leadsDoLote = [];
-      let processados = 0;
+        process.stdout.write(`\n  ${prog} ${bairro}: buscando...`);
 
-      for (let j = 0; j < links.length; j += CONFIG.paginasParalelas) {
-        const restante = CONFIG.limiteDiario - totalLeads - leadsDoLote.length;
-        if (restante <= 0) {
-          limiteAtingido = true;
-          break;
+        const links = await rasparBairro(pagePrincipal, bairro, cidade, termo).catch(() => []);
+        process.stdout.write(` ${links.length} lugares`);
+
+        const leadsDoLote = [];
+        let processados = 0;
+
+        for (let j = 0; j < links.length; j += CONFIG.paginasParalelas) {
+          const restante = CONFIG.limiteDiario - totalLeads - leadsDoLote.length;
+          if (restante <= 0) {
+            limiteAtingido = true;
+            break;
+          }
+
+          const bloco = links.slice(j, j + CONFIG.paginasParalelas);
+          const resultados = await Promise.all(
+            bloco.map((link, idx) => processarLink(pagesParalelas[idx], link, bairro, cidade, termo, chavesVistas, chavesExistentes))
+          );
+
+          for (const lead of resultados) {
+            processados++;
+            if (!lead) continue;
+            leadsDoLote.push(lead);
+            if (lead.email !== NAO) totalEmail++;
+            if (lead.facebook !== NAO) totalFacebook++;
+          }
+
+          process.stdout.write(`\r  ${prog} ${bairro}: ${processados}/${links.length} | novos: ${leadsDoLote.length}        `);
         }
 
-        const bloco = links.slice(j, j + CONFIG.paginasParalelas);
-        const resultados = await Promise.all(
-          bloco.map((link, idx) => processarLink(pagesParalelas[idx], link, bairro, cidade, chavesVistas, chavesExistentes))
-        );
+        await appendLote(sheets, leadsDoLote);
+        totalLeads += leadsDoLote.length;
 
-        for (const lead of resultados) {
-          processados++;
-          if (!lead) continue;
-          leadsDoLote.push(lead);
-          if (lead.email !== NAO) totalEmail++;
-          if (lead.facebook !== NAO) totalFacebook++;
+        process.stdout.write(`\r  ${prog} ${bairro}: ${leadsDoLote.length} leads salvos ✓                          `);
+
+        if (limiteAtingido) {
+          salvarProgresso(ti, ci, i);
+          console.log(`\n\n  ⚠ Limite de ${CONFIG.limiteDiario} leads atingido.`);
+          console.log(`  → Retomará: ${termo} / ${cidade} / ${bairro}`);
+          break mainLoop;
         }
-
-        process.stdout.write(`\r  ${prog} ${bairro}: ${processados}/${links.length} | novos: ${leadsDoLote.length}        `);
-      }
-
-      await appendLote(sheets, leadsDoLote);
-      totalLeads += leadsDoLote.length;
-
-      process.stdout.write(`\r  ${prog} ${bairro}: ${leadsDoLote.length} leads salvos ✓                          `);
-
-      if (limiteAtingido) {
-        salvarProgresso(ci, i);
-        console.log(`\n\n  ⚠ Limite de ${CONFIG.limiteDiario} leads atingido.`);
-        console.log(`  → Retomará: ${cidade} / ${bairro}`);
-        break mainLoop;
       }
     }
   }
 
   if (!limiteAtingido) {
     limparProgresso();
-    console.log("\n\n  ✓ Todas as cidades concluidas. Progresso resetado.");
+    console.log("\n\n  ✓ Todos os nichos e cidades concluidos. Progresso resetado.");
   }
 
   await browser.close();
