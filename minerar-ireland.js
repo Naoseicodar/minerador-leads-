@@ -85,26 +85,41 @@ function limparProgresso() {
 
 const NAO = "Não encontrado";
 
+// County (condado) por cidade
+const COUNTY_MAP = {
+  "Dublin":    "Co. Dublin",
+  "Cork":      "Co. Cork",
+  "Galway":    "Co. Galway",
+  "Limerick":  "Co. Limerick",
+  "Waterford": "Co. Waterford",
+  "Kilkenny":  "Co. Kilkenny",
+  "Drogheda":  "Co. Louth",
+};
+
 // =============================================
-// CABECALHO (12 colunas)
+// CABECALHO (15 colunas)
+// A-F: dados de contato | G: rua (oculta) | H-J: localização | K-O: metricas/meta
 // =============================================
 const CABECALHO = [
-  "Status do Lead",       // A  ← primeiro para acompanhamento imediato
+  "Status do Lead",       // A
   "Nome da Empresa",      // B
   "Telefone",             // C
   "Email",                // D
   "Facebook",             // E
   "Website",              // F
-  "Endereço",             // G
-  "City",                 // H
-  "Avaliação Google ⭐",  // I
-  "Nº Avaliações",        // J
-  "Link Maps",            // K
-  "Data da Busca",        // L
-  "Observações",          // M
+  "Rua",                  // G  ← oculta por padrão
+  "Área / Bairro",        // H
+  "Cidade",               // I
+  "County",               // J
+  "Avaliação Google ⭐",  // K
+  "Nº Avaliações",        // L
+  "Link Maps",            // M
+  "Data da Busca",        // N
+  "Observações",          // O
 ];
 
-const LARGURAS = [150, 220, 145, 205, 185, 195, 245, 125, 125, 110, 220, 115, 220];
+//                  A    B    C    D    E    F   G(oculta) H    I    J    K    L    M    N    O
+const LARGURAS = [150, 220, 145, 205, 185, 195,   0,      155, 120, 130, 110, 100, 220, 100, 220];
 
 // =============================================
 // UTILITARIOS
@@ -413,60 +428,99 @@ async function garantirCabecalho(sheets) {
     return;
   }
 
-  // Detecta estrutura antiga (14 colunas, começa com "Nome da Empresa")
-  const estruturaAntiga = cabecalhoAtual[0] === "Nome da Empresa" && cabecalhoAtual.length === 14;
-  // Detecta estrutura v2 sem Link Maps (12 colunas, começa com "Status do Lead")
-  const estruturaV2 = cabecalhoAtual[0] === "Status do Lead" && cabecalhoAtual.length === 12;
+  // Detecta versões anteriores da planilha
+  const estruturaAntiga  = cabecalhoAtual[0] === "Nome da Empresa"  && cabecalhoAtual.length === 14; // v1
+  const estruturaV2      = cabecalhoAtual[0] === "Status do Lead"   && cabecalhoAtual.length === 12; // v2
+  const estruturaV3      = cabecalhoAtual[0] === "Status do Lead"   && cabecalhoAtual.length === 13; // v3 (13 col sem area/city/county separados)
   let dadosMigrados = [];
 
   if (estruturaAntiga) {
-    console.log("  → Estrutura antiga detectada, migrando dados...");
+    console.log("  → Estrutura v1 detectada, migrando...");
     const dadosRes = await sheets.spreadsheets.values.get({
       spreadsheetId: CONFIG.sheetId,
       range: `${CONFIG.sheetNome}!A2:N`,
     }).catch(() => null);
 
     const linhas = dadosRes?.data?.values || [];
-    dadosMigrados = linhas.map(r => [
-      r[11] || "Not Contacted",  // Status
-      r[0]  || "",               // Nome
-      r[1]  || "",               // Telefone
-      r[9]  || "",               // Email
-      r[10] || "",               // Facebook
-      r[2]  || "",               // Website
-      r[3]  || "",               // Endereço
-      r[4]  || "",               // City
-      r[6]  || "",               // Avaliação
-      r[7]  || "",               // Nº Avaliações
-      "",                        // Link Maps (novo)
-      r[12] || "",               // Data
-      r[13] || "",               // Observações
-    ]);
-    console.log(`  → ${dadosMigrados.length} leads serão migrados`);
+    dadosMigrados = linhas.map(r => {
+      const cidade = r[4] || "";
+      return [
+        r[11] || "Not Contacted",          // A Status
+        r[0]  || "",                        // B Nome
+        r[1]  || "",                        // C Telefone
+        r[9]  || "",                        // D Email
+        r[10] || "",                        // E Facebook
+        r[2]  || "",                        // F Website
+        r[3]  || "",                        // G Rua (endereço completo antigo)
+        "",                                 // H Área
+        cidade,                             // I Cidade
+        COUNTY_MAP[cidade] || "",           // J County
+        r[6]  || "",                        // K Avaliação
+        r[7]  || "",                        // L Nº Avaliações
+        "",                                 // M Link Maps
+        r[12] || "",                        // N Data
+        r[13] || "",                        // O Observações
+      ];
+    });
+    console.log(`  → ${dadosMigrados.length} leads migrados`);
   } else if (estruturaV2) {
-    console.log("  → Estrutura v2 detectada, adicionando coluna Link Maps...");
+    console.log("  → Estrutura v2 detectada, migrando...");
     const dadosRes = await sheets.spreadsheets.values.get({
       spreadsheetId: CONFIG.sheetId,
       range: `${CONFIG.sheetNome}!A2:L`,
     }).catch(() => null);
 
     const linhas = dadosRes?.data?.values || [];
-    dadosMigrados = linhas.map(r => [
-      r[0]  || "Not Contacted",  // Status
-      r[1]  || "",               // Nome
-      r[2]  || "",               // Telefone
-      r[3]  || "",               // Email
-      r[4]  || "",               // Facebook
-      r[5]  || "",               // Website
-      r[6]  || "",               // Endereço
-      r[7]  || "",               // City
-      r[8]  || "",               // Avaliação
-      r[9]  || "",               // Nº Avaliações
-      "",                        // Link Maps (novo)
-      r[10] || "",               // Data
-      r[11] || "",               // Observações
-    ]);
-    console.log(`  → ${dadosMigrados.length} leads serão migrados`);
+    dadosMigrados = linhas.map(r => {
+      const cidade = r[7] || "";
+      return [
+        r[0]  || "Not Contacted",           // A Status
+        r[1]  || "",                         // B Nome
+        r[2]  || "",                         // C Telefone
+        r[3]  || "",                         // D Email
+        r[4]  || "",                         // E Facebook
+        r[5]  || "",                         // F Website
+        r[6]  || "",                         // G Rua
+        "",                                  // H Área
+        cidade,                              // I Cidade
+        COUNTY_MAP[cidade] || "",            // J County
+        r[8]  || "",                         // K Avaliação
+        r[9]  || "",                         // L Nº Avaliações
+        "",                                  // M Link Maps
+        r[10] || "",                         // N Data
+        r[11] || "",                         // O Observações
+      ];
+    });
+    console.log(`  → ${dadosMigrados.length} leads migrados`);
+  } else if (estruturaV3) {
+    console.log("  → Estrutura v3 detectada, migrando para v4 (área/cidade/county separados)...");
+    const dadosRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: CONFIG.sheetId,
+      range: `${CONFIG.sheetNome}!A2:M`,
+    }).catch(() => null);
+
+    const linhas = dadosRes?.data?.values || [];
+    dadosMigrados = linhas.map(r => {
+      const cidade = r[7] || "";
+      return [
+        r[0]  || "Not Contacted",           // A Status
+        r[1]  || "",                         // B Nome
+        r[2]  || "",                         // C Telefone
+        r[3]  || "",                         // D Email
+        r[4]  || "",                         // E Facebook
+        r[5]  || "",                         // F Website
+        r[6]  || "",                         // G Rua
+        "",                                  // H Área (não havia antes)
+        cidade,                              // I Cidade (era "City" col H)
+        COUNTY_MAP[cidade] || "",            // J County
+        r[8]  || "",                         // K Avaliação
+        r[9]  || "",                         // L Nº Avaliações
+        r[10] || "",                         // M Link Maps
+        r[11] || "",                         // N Data
+        r[12] || "",                         // O Observações
+      ];
+    });
+    console.log(`  → ${dadosMigrados.length} leads migrados`);
   }
 
   // Limpa e reescreve com nova estrutura + dados migrados
@@ -519,6 +573,8 @@ async function aplicarFormatacao(sheets, gid) {
         { updateSheetProperties: { properties: { sheetId: gid, gridProperties: { frozenRowCount: 1 } }, fields: "gridProperties.frozenRowCount" } },
         { setBasicFilter: { filter: { range: { sheetId: gid, startRowIndex: 0, startColumnIndex: 0, endColumnIndex: CABECALHO.length } } } },
         { updateDimensionProperties: { range: { sheetId: gid, dimension: "ROWS", startIndex: 0, endIndex: 1 }, properties: { pixelSize: 38 }, fields: "pixelSize" } },
+        // Oculta coluna G (Rua) — index 6
+        { updateDimensionProperties: { range: { sheetId: gid, dimension: "COLUMNS", startIndex: 6, endIndex: 7 }, properties: { hiddenByUser: true }, fields: "hiddenByUser" } },
         {
           setDataValidation: {
             // Status do Lead agora é coluna A (index 0)
@@ -587,17 +643,17 @@ async function carregarChavesExistentes(sheets) {
   // Column order: A=Status, B=Name, C=Phone, D=Email, E=Facebook, F=Website, G=Address
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: CONFIG.sheetId,
-    range: `${CONFIG.sheetNome}!A2:G`,
+    range: `${CONFIG.sheetNome}!A2:I`,
   }).catch(() => null);
 
   const chaves = new Set();
   const rows = res?.data?.values || [];
   for (const row of rows) {
-    const nome = row[1] || "";
+    const nome     = row[1] || "";
     const telefone = row[2] || "";
-    const endereco = row[6] || "";
+    const rua      = row[6] || "";
     if (telefone && telefone !== NAO) chaves.add(telefone.replace(/\D/g, ""));
-    if (nome && endereco) chaves.add(`${nome}|${endereco}`);
+    if (nome && rua) chaves.add(`${nome}|${rua}`);
   }
   console.log(`  → ${chaves.size} leads já existentes carregados`);
   return chaves;
@@ -605,19 +661,21 @@ async function carregarChavesExistentes(sheets) {
 
 function formatarLinha(lead) {
   return [
-    "Not Contacted",
-    val(lead.nome),
-    lead.telefone ? formatarTelefone(lead.telefone) : NAO,
-    val(lead.email),
-    val(lead.facebook),
-    val(lead.website),
-    val(lead.endereco),
-    val(lead.bairro),
-    lead.avaliacao || NAO,
-    lead.reviews || NAO,
-    val(lead.mapsLink),
-    new Date().toLocaleDateString("en-IE"),
-    "",
+    "Not Contacted",                                       // A Status
+    val(lead.nome),                                        // B Nome
+    lead.telefone ? formatarTelefone(lead.telefone) : NAO, // C Telefone
+    val(lead.email),                                       // D Email
+    val(lead.facebook),                                    // E Facebook
+    val(lead.website),                                     // F Website
+    val(lead.rua),                                         // G Rua (oculta)
+    val(lead.area),                                        // H Área / Bairro
+    val(lead.cidade),                                      // I Cidade
+    val(lead.county),                                      // J County
+    lead.avaliacao || NAO,                                 // K Avaliação
+    lead.reviews || NAO,                                   // L Nº Avaliações
+    val(lead.mapsLink),                                    // M Link Maps
+    new Date().toLocaleDateString("en-IE"),                // N Data
+    "",                                                    // O Observações
   ];
 }
 
@@ -721,7 +779,7 @@ async function rasparBairro(page, bairro, cidade) {
 }
 
 // Processa um link e retorna o lead ou null
-async function processarLink(page, link, area, chavesVistas, chavesExistentes) {
+async function processarLink(page, link, area, cidade, chavesVistas, chavesExistentes) {
   try {
     await page.goto(link + "?hl=en", { waitUntil: "domcontentloaded", timeout: 18000 });
     await sleep(CONFIG.delayMin, CONFIG.delayMax);
@@ -750,7 +808,8 @@ async function processarLink(page, link, area, chavesVistas, chavesExistentes) {
     if (chavesVistas.has(chave) || chavesExistentes.has(chaveTel) || chavesExistentes.has(chaveNome)) return null;
     chavesVistas.add(chave);
 
-    const lead = { ...dados, bairro: area, mapsLink: link, email: NAO, facebook: NAO };
+    const county = COUNTY_MAP[cidade] || `Co. ${cidade}`;
+    const lead = { ...dados, rua: dados.endereco, area, cidade, county, mapsLink: link, email: NAO, facebook: NAO };
     let dominioEncontrado = "";
 
     // CAMADA 1: email direto na página do Maps (descrição, posts)
@@ -891,7 +950,7 @@ async function main() {
 
         const bloco = links.slice(j, j + CONFIG.paginasParalelas);
         const resultados = await Promise.all(
-          bloco.map((link, idx) => processarLink(pagesParalelas[idx], link, cidade, chavesVistas, chavesExistentes))
+          bloco.map((link, idx) => processarLink(pagesParalelas[idx], link, bairro, cidade, chavesVistas, chavesExistentes))
         );
 
         for (const lead of resultados) {

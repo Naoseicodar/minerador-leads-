@@ -2,7 +2,7 @@ name: Ireland Business Miner
 
 on:
   schedule:
-    - cron: "0 8 * * *"  # 8h00 UTC (9h00 Ireland / 5h00 Brasilia)
+    - cron: "30 8 * * *"  # 8h30 UTC (8h30 GMT / 9h30 IST — Ireland horário local)
   workflow_dispatch:
     inputs:
       limite_diario:
