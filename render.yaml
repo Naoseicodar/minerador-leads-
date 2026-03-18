@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: zapchat-bot
+    runtime: docker
+    plan: starter          # $7/mes — necessario para disco persistente
+    healthCheckPath: /status
+
+    disk:
+      name: whatsapp-session
+      mountPath: /app/.wwebjs_auth   # sessao do WhatsApp persiste entre deploys
+      sizeGB: 1                      # +$0.25/mes
+
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SHEET_ID
+        sync: false
+      - key: MEU_NUMERO_ZAP
+        sync: false
+      - key: LIMITE_ZAP
+        value: "33"
+      - key: HORARIO_INICIO
+        value: "8"
+      - key: HORARIO_FIM
+        value: "22"
+      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        value: "true"
+      - key: PUPPETEER_EXECUTABLE_PATH
+        value: "/usr/bin/chromium"

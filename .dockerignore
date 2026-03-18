@@ -1,0 +1,9 @@
+.wwebjs_auth
+.wwebjs_cache
+node_modules
+.env
+status.json
+control.json
+_audio_tmp_*
+*.log
+nul

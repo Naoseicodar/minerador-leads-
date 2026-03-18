@@ -1,8 +1,13 @@
 node_modules/
 credentials.json
+.wwebjs_auth/
+.wwebjs_cache/
+status.json
+control.json
 progresso.json
 progresso-ireland.json
 instagram-session.json
 .env
 nul
 *.csv
+_audio_tmp_*
