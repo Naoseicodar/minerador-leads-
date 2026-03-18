@@ -5,7 +5,8 @@
  */
 
 require("dotenv").config();
-const { Client, LocalAuth, MessageMedia } = require("whatsapp-web.js");
+const { Client, LocalAuth, RemoteAuth, MessageMedia } = require("whatsapp-web.js");
+const { SupabaseStore } = require("./supabase-store");
 const Anthropic = require("@anthropic-ai/sdk");
 const OpenAI = require("openai");
 const { google } = require("googleapis");
@@ -817,8 +818,17 @@ function cancelarFollowUps(chatId) {
 // =============================================
 async function main() {
 
+  // RemoteAuth no Render (Supabase), LocalAuth local
+  const authStrategy = process.env.SUPABASE_URL
+    ? new RemoteAuth({
+        store: new SupabaseStore(),
+        clientId: "zapchat",
+        backupSyncIntervalMs: 5 * 60 * 1000, // salva sessao a cada 5min
+      })
+    : new LocalAuth({ clientId: "zapchat" });
+
   const client = new Client({
-    authStrategy: new LocalAuth({ clientId: "zapchat" }),
+    authStrategy,
     pairWithPhoneNumber: { phoneNumber: CONFIG.meuNumero },
     puppeteer: {
       headless: true,
