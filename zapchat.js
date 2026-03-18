@@ -12,6 +12,14 @@ const { google } = require("googleapis");
 const path = require("path");
 const fs = require("fs");
 
+// No Render: decodifica credentials.json a partir de variavel de ambiente
+if (process.env.GOOGLE_CREDENTIALS_B64 && !fs.existsSync(path.join(__dirname, "credentials.json"))) {
+  fs.writeFileSync(
+    path.join(__dirname, "credentials.json"),
+    Buffer.from(process.env.GOOGLE_CREDENTIALS_B64, "base64")
+  );
+}
+
 const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 // =============================================
