@@ -39,7 +39,7 @@ Módulo de disparo de emails via nodemailer (Gmail + app password).
 - Usa a copy da coluna N/O se disponível, senão usa template padrão
 - Após envio: marca coluna `Status` como `Email Sent`
 - Delay aleatório 45–120s entre envios
-- Limite de 40 emails/dia (contador em arquivo local)
+- Limite de 40 emails/dia (contador em `portugal/email-count-pt-YYYY-MM-DD.json`, mesmo padrão do BR)
 - Emite logs via Socket.IO no evento `email-log`
 
 ### Arquivos modificados
@@ -47,20 +47,21 @@ Módulo de disparo de emails via nodemailer (Gmail + app password).
 **`portugal/miner-engine-pt.js`**
 Adiciona Layer 5 no final de `processLead()`:
 - Chama `generateCopy(lead)` após todas as outras camadas
-- Salva resultado nas colunas N (Assunto Sugerido) e O (Copy do Email) do Google Sheets
+- Inclui `subject` e `body` no objeto `d` antes de chamar `leadsBuffer.push(d)`
+- `flushBuffer()` já monta as linhas para append — adicionar colunas N e O ao array de valores existente (índices 13 e 14)
 
 **`server.js`**
-4 novas rotas:
-- `GET /api/leads` — lê aba `Leads-Premium` e retorna JSON
-- `POST /api/email/start` — inicia o email-sender-pt.js
-- `POST /api/email/pause` — pausa envio
-- `POST /api/email/stop` — para envio
+1 rota modificada + 3 novas:
+- `GET /api/leads` — **já existe**, mas com range `A2:M`. Atualizar range para `A2:O` para incluir colunas N e O (copy da IA)
+- `POST /api/email/start` — inicia o email-sender-pt.js; recebe `{ subject, body }` opcionais do compositor; se omitidos, usa colunas N/O da planilha por lead
+- `POST /api/email/pause` — seta flag `isPaused = true`; o sender termina o delay atual e pausa antes do próximo envio; `POST /api/email/start` subsequente retoma da fila (não recomeça do zero)
+- `POST /api/email/stop` — encerra completamente; próximo start recomeça do início da lista
 
 **`public/index.html` + `public/app.js`**
 - Sidebar: 2 novos itens de navegação
 - Seção CRM: tabela densa com colunas Nome, Nicho, Telefone, Email, Ações (WPP + Site + botão ✨)
 - Modal ✨: exibe Assunto e Copy gerados pela IA, com botão "Copiar"
-- Seção Email Marketing: compositor (assunto + corpo) à esquerda, terminal ao vivo à direita
+- Seção Email Marketing: compositor (assunto + corpo) à esquerda — campos pré-preenchidos com copy genérica editável; se o usuário não editar, o sender usa a copy individual da IA por lead (coluna N/O); se editar, sobrescreve para todos os leads da campanha
 - Botões: Disparar, Pausar, Parar — com estado gerenciado
 - Contador: "X leads com email · Limite: 40/dia"
 
@@ -106,7 +107,8 @@ Email Marketing: compor/usar copy da IA → POST /api/email/start → logs ao vi
 
 - `openai` (npm) — para gpt-3.5-turbo
 - `nodemailer` (já instalado) — para envio de emails
-- Env vars necessárias: `OPENAI_API_KEY`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`
+- Env vars necessárias: `OPENAI_API_KEY`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`, `SHEET_ID_PORTUGAL` (já existente no .env)
+- `credentials.json` (já existente na raiz) — autenticação Google Sheets
 
 ---
 
