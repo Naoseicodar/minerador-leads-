@@ -258,3 +258,15 @@ cron.schedule('0 8 * * *', async () => {
 bot.launch().then(() => console.log("🚀 Telegram AI Agent (Nível 3 - Mega Inteligente & Cronometrado) Online!"));
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
+
+// =============================================
+// Servidor Web Dummy (Para o Healthcheck do Railway)
+// =============================================
+const http = require('http');
+const PORT = process.env.PORT || 3000;
+http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Bot Online e Saudavel!\\n');
+}).listen(PORT, () => {
+    console.log(`🌍 Healthcheck do Railway rodando na porta ${PORT}`);
+});
