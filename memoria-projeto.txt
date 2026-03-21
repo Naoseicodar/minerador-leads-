@@ -1,0 +1,11 @@
+# Memória do Projeto: Minerador de Leads
+**Data da última atualização:** 21/03/2026
+
+## Resumo do Dia Atual (21/03/2026)
+- **Logos & Nomenclatura:** Discutimos a criação de logos e o novo nome do projeto. Como 'noxtech.com' estava em uso, Luan decidiu utilizar o domínio **noxtech.dev**. A marca foca em serviços de desenvolvimento web rápido e SEO local (48 horas de entrega) em Portugal e no Brasil.
+- **Bot do Telegram:** Luan pediu a criação de um bot integrado com Inteligência Artificial para gerenciar tarefas e enviar relatórios pelo Telegram.
+- **Implementação do Bot:** Usamos a API da OpenAI (modelo gpt-4o-mini). O arquivo `telegram-agent.js` foi criado.
+- **Nova Inteligência do Bot (Upgrade 1):** O bot agoram tem acesso ao `memoria-projeto.txt`, podendo ler qualquer arquivo e listar pastas do PC. Ele também recebeu poder de ler comandos de terminal silenciosamente, ganhando controle total sobre comandos do GitHub (`git status`, `git pull`) e entendimento total de tudo que o Claude (eu, a IA do código) codifico aqui no background!
+
+## Como ler e atualizar?
+Sempre que perguntado sobre "o que fizemos" ou "relatório do dia", o Agente de Telegram deve ler este arquivo. Nós (as IA de código) manteremos este arquivo sempre atualizado.

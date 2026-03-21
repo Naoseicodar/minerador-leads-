@@ -1,0 +1,91 @@
+<h2>Como exibir os leads no CRM?</h2>
+<p class="subtitle">Os dados vêm da aba "Leads-Premium" do Google Sheets: Nome, Nicho, Telefone, Email, Social, Website, Cidade, Status</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Tabela densa com ações inline</h3>
+      <div style="margin:10px 0;border-radius:8px;overflow:hidden;font-size:11px;">
+        <div style="display:grid;grid-template-columns:2fr 1fr 1.2fr 1fr 80px;background:rgba(59,130,246,0.2);padding:6px 10px;color:#93c5fd;gap:8px;">
+          <span>Nome</span><span>Nicho</span><span>Telefone</span><span>Email</span><span>Ações</span>
+        </div>
+        <div style="display:grid;grid-template-columns:2fr 1fr 1.2fr 1fr 80px;padding:6px 10px;color:#e2e8f0;gap:8px;border-bottom:1px solid rgba(255,255,255,0.05);">
+          <span>João Canalizações Lda</span><span>🔧 Canalizador</span><span>+351 912 345</span><span>joao@...</span>
+          <span style="display:flex;gap:4px;"><span style="background:#25d366;border-radius:4px;padding:2px 5px;">WPP</span><span style="background:#1877f2;border-radius:4px;padding:2px 5px;">🌐</span></span>
+        </div>
+        <div style="display:grid;grid-template-columns:2fr 1fr 1.2fr 1fr 80px;padding:6px 10px;color:#e2e8f0;gap:8px;border-bottom:1px solid rgba(255,255,255,0.05);">
+          <span>Manuel Obras</span><span>🏗️ Pedreiro</span><span>+351 934 678</span><span>—</span>
+          <span style="display:flex;gap:4px;"><span style="background:#25d366;border-radius:4px;padding:2px 5px;">WPP</span></span>
+        </div>
+        <div style="display:grid;grid-template-columns:2fr 1fr 1.2fr 1fr 80px;padding:6px 10px;color:#94a3b8;gap:8px;">
+          <span>... mais 147 leads</span>
+        </div>
+      </div>
+      <p>Máximo de informação por linha. Filtros no topo por nicho/status. Ação rápida sem abrir nada.</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Cards em grid (estilo Kanban)</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:10px 0;font-size:11px;">
+        <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;border-left:3px solid #3b82f6;">
+          <div style="font-weight:600;color:#e2e8f0;margin-bottom:4px;">João Canalizações</div>
+          <div style="color:#64748b;">🔧 Canalizador · Lisboa</div>
+          <div style="color:#10b981;margin-top:6px;font-size:10px;">✉ joao@gmail.com</div>
+          <div style="display:flex;gap:4px;margin-top:8px;">
+            <span style="background:#25d366;border-radius:4px;padding:2px 6px;color:white;">WPP</span>
+            <span style="background:#1877f2;border-radius:4px;padding:2px 6px;color:white;">FB</span>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;border-left:3px solid #f59e0b;">
+          <div style="font-weight:600;color:#e2e8f0;margin-bottom:4px;">Manuel Obras</div>
+          <div style="color:#64748b;">🏗️ Pedreiro · Porto</div>
+          <div style="color:#94a3b8;margin-top:6px;font-size:10px;">Sem email</div>
+          <div style="display:flex;gap:4px;margin-top:8px;">
+            <span style="background:#25d366;border-radius:4px;padding:2px 6px;color:white;">WPP</span>
+          </div>
+        </div>
+        <div style="background:rgba(255,255,255,0.05);border-radius:8px;padding:10px;border-left:3px solid #8b5cf6;">
+          <div style="font-weight:600;color:#e2e8f0;margin-bottom:4px;">Carlos Elétrica</div>
+          <div style="color:#64748b;">⚡ Eletricista · Sintra</div>
+          <div style="color:#10b981;margin-top:6px;font-size:10px;">✉ carlos@...</div>
+          <div style="display:flex;gap:4px;margin-top:8px;">
+            <span style="background:#25d366;border-radius:4px;padding:2px 6px;color:white;">WPP</span>
+            <span style="background:#e1306c;border-radius:4px;padding:2px 6px;color:white;">IG</span>
+          </div>
+        </div>
+      </div>
+      <p>Visual premium, cada lead com destaque. Mais espaço, menos densidade. Melhor para poucos leads (até ~50).</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Tabela + painel lateral de detalhe</h3>
+      <div style="display:flex;gap:8px;margin:10px 0;font-size:11px;">
+        <div style="flex:1.5;background:rgba(255,255,255,0.04);border-radius:8px;padding:8px;">
+          <div style="color:#93c5fd;font-size:10px;margin-bottom:6px;">LISTA</div>
+          <div style="padding:5px;border-radius:5px;background:rgba(59,130,246,0.2);color:#e2e8f0;margin-bottom:4px;">João Canalizações ←</div>
+          <div style="padding:5px;color:#64748b;margin-bottom:4px;">Manuel Obras</div>
+          <div style="padding:5px;color:#64748b;">Carlos Elétrica</div>
+        </div>
+        <div style="flex:1;background:rgba(255,255,255,0.06);border-radius:8px;padding:8px;border:1px solid rgba(59,130,246,0.3);">
+          <div style="color:#93c5fd;font-size:10px;margin-bottom:6px;">DETALHE</div>
+          <div style="color:#e2e8f0;font-weight:600;margin-bottom:4px;">João Canalizações</div>
+          <div style="color:#64748b;margin-bottom:2px;">📞 +351 912 345</div>
+          <div style="color:#64748b;margin-bottom:2px;">✉ joao@gmail.com</div>
+          <div style="color:#64748b;margin-bottom:8px;">🌐 joaocanal.pt</div>
+          <div style="display:flex;gap:4px;">
+            <div style="background:#25d366;border-radius:4px;padding:3px 8px;color:white;font-size:10px;">WhatsApp</div>
+            <div style="background:#3b82f6;border-radius:4px;padding:3px 8px;color:white;font-size:10px;">Site</div>
+          </div>
+        </div>
+      </div>
+      <p>Clicar em um lead abre detalhes completos ao lado. Interface mais limpa, mas requer dois cliques para agir.</p>
+    </div>
+  </div>
+</div>

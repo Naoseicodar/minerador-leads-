@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #060a08;
+            --bg-2: #0a0f0c;
+            --bg-3: #0f1a13;
+            --accent: #10b981;
+            --accent-l: #34d399;
+            --text: #f0fdf4;
+            --text-s: #94a3b8;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Manrope', sans-serif; background: #e2e8f0; display:flex; flex-direction:column; gap:20px; padding:20px;}
+        
+        .asset { position: relative; overflow: hidden; }
+        .flex-center { display: flex; align-items: center; justify-content: center; }
+        
+        /* The Prism SVG definition */
+        .prism-logo { width: 100%; height: 100%; display:block; }
+        .logo-text-vertical { font-family: 'Syne', sans-serif; font-size: 72px; font-weight: 900; color: var(--text); letter-spacing:-0.02em; margin-top:20px; }
+        .logo-text-vertical span { color: var(--accent); font-weight: 800; font-size: 40px; letter-spacing:0.05em; display:block; text-align:center; }
+        .logo-text-horizontal { font-family: 'Syne', sans-serif; font-size: 64px; font-weight: 900; color: var(--text); letter-spacing:-0.02em; display:flex; align-items:baseline; }
+        .logo-text-horizontal span { color: var(--accent); font-weight: 800; font-size: 36px; letter-spacing:0.05em; margin-left:12px; }
+
+        .logo-text-vertical-dark { font-family: 'Syne', sans-serif; font-size: 72px; font-weight: 900; color: #000; letter-spacing:-0.02em; margin-top:20px; }
+        .logo-text-vertical-dark span { color: var(--accent); font-weight: 800; font-size: 40px; letter-spacing:0.05em; display:block; text-align:center; }
+
+        /* 1 & 2 & 3. Logo Squares */
+        #logo-dark { width: 800px; height: 800px; background: var(--bg); flex-direction:column; }
+        #logo-light { width: 800px; height: 800px; background: #ffffff; flex-direction:column; }
+        #logo-transparent { width: 800px; height: 800px; background: transparent; flex-direction:column; }
+
+        /* 4. Cartão Frente */
+        #cartao-frente { width: 1050px; height: 600px; background: var(--bg-2); border: 2px solid rgba(16,185,129,0.1); flex-direction:column; position:relative;}
+        #cartao-frente::before { content:''; position:absolute; top:0;left:0;right:0;height:4px; background:var(--accent); }
+        
+        /* 5. Cartão Verso */
+        #cartao-verso { width: 1050px; height: 600px; background: var(--accent); color:#000; position:relative; overflow:hidden;}
+        .card-content { display:flex; justify-content:space-between; align-items:center; width:100%; padding:0 100px; z-index:2;}
+        .card-details h1 { font-family: 'Syne', sans-serif; font-weight:800; font-size:42px; line-height:1;}
+        .card-details h2 { font-weight:600; font-size:20px; opacity:0.8; margin-bottom:40px; }
+        .info-line { display:flex; align-items:center; gap:16px; font-size:22px; font-weight:600; margin-bottom:16px;}
+        
+        /* 6. Email Signature */
+        #email-signature { width: 600px; height: 200px; background: transparent; display:flex; align-items:center; padding: 0 40px; gap: 30px;}
+        .sig-divider { width: 2px; height: 100px; background: var(--accent); }
+        .sig-info h3 { font-family: 'Syne', sans-serif; color:var(--text); font-size: 24px; font-weight:800; line-height:1;}
+        .sig-info p.role { color: var(--accent); font-size:14px; font-weight:700; margin-bottom:12px; }
+        .sig-info p.contact { color: var(--text-s); font-size:13px; font-weight:500; }
+        .sig-info a { color: var(--text); text-decoration:none; margin-right:12px; font-weight:600;}
+
+        /* 7. Letterhead A4 */
+        #letterhead-a4 { width: 2480px; height: 3508px; background: #ffffff; display:flex; flex-direction:column; position:relative; }
+        .lh-header { padding: 120px 160px; display:flex; justify-content:space-between; align-items:flex-end; border-bottom:4px solid var(--accent);}
+        .lh-footer { position:absolute; bottom:0; left:0; right:0; padding:120px 160px; display:flex; justify-content:space-between; background:var(--bg); color:var(--text-s); font-size:32px;}
+        
+        /* 8. Profile Pic */
+        #profile-pic { width: 1080px; height: 1080px; background: var(--bg); position:relative;}
+        .inner-glow { position:absolute; width: 600px; height: 600px; background:radial-gradient(circle, rgba(16,185,129,0.3) 0%, transparent 70%); }
+
+        /* 9. Banner Social */
+        #banner-social { width: 1920px; height: 1080px; background: var(--bg-2); position:relative; overflow:hidden;}
+        #banner-social::before { content:''; position:absolute; inset:0; background-image:radial-gradient(rgba(16,185,129,0.1) 2px, transparent 2px); background-size: 60px 60px;}
+        .banner-content { z-index:2; text-align:center; display:flex; flex-direction:column; align-items:center; gap:40px; }
+        .banner-title { font-family: 'Syne', sans-serif; font-size: 96px; font-weight: 900; color: #fff; letter-spacing:-0.03em; line-height:1.1;}
+        .banner-tag { background:rgba(16,185,129,0.15); border:2px solid rgba(16,185,129,0.3); color:var(--accent-l); padding:16px 40px; font-size:32px; font-weight:700; border-radius:100px; }
+
+    </style>
+</head>
+<body>
+
+<!-- SVG MACRO -->
+<svg style="display:none;">
+    <defs>
+        <g id="prisma-svg">
+            <path d="M32 4 L56 18 L56 46 L32 60 L8 46 L8 18 Z" fill="rgba(16,185,129,0.05)" stroke="#10b981" stroke-width="2"/>
+            <path d="M32 4 L32 32 L56 46" stroke="#34d399" stroke-width="2"/>
+            <path d="M32 32 L8 46" stroke="#059669" stroke-width="2"/>
+            <path d="M16 22 L16 38 L32 48 L32 32 Z" fill="#10b981"/>
+            <path d="M32 16 L48 26 L48 42 L32 32 Z" fill="rgba(255,255,255,0.9)"/>
+        </g>
+        <g id="prisma-svg-dark">
+            <path d="M32 4 L56 18 L56 46 L32 60 L8 46 L8 18 Z" fill="rgba(16,185,129,0.05)" stroke="#10b981" stroke-width="2"/>
+            <path d="M32 4 L32 32 L56 46" stroke="#34d399" stroke-width="2"/>
+            <path d="M32 32 L8 46" stroke="#059669" stroke-width="2"/>
+            <path d="M16 22 L16 38 L32 48 L32 32 Z" fill="#10b981"/>
+            <path d="M32 16 L48 26 L48 42 L32 32 Z" fill="#000000"/>
+        </g>
+        <g id="prisma-svg-white">
+            <path d="M32 4 L56 18 L56 46 L32 60 L8 46 L8 18 Z" fill="rgba(255,255,255,0.05)" stroke="#ffffff" stroke-width="2"/>
+            <path d="M32 4 L32 32 L56 46" stroke="#ffffff" stroke-width="2"/>
+            <path d="M32 32 L8 46" stroke="#ffffff" stroke-width="2"/>
+            <path d="M16 22 L16 38 L32 48 L32 32 Z" fill="#ffffff"/>
+            <path d="M32 16 L48 26 L48 42 L32 32 Z" fill="rgba(0,0,0,0.5)"/>
+        </g>
+    </defs>
+</svg>
+
+<!-- 1. logo-dark -->
+<div id="logo-dark" class="asset flex-center">
+    <svg viewBox="0 0 64 64" fill="none" style="width:250px; height:250px;"><use href="#prisma-svg"/></svg>
+    <div class="logo-text-vertical">NOX<span>TECH</span></div>
+</div>
+
+<!-- 2. logo-light -->
+<div id="logo-light" class="asset flex-center">
+    <svg viewBox="0 0 64 64" fill="none" style="width:250px; height:250px;"><use href="#prisma-svg-dark"/></svg>
+    <div class="logo-text-vertical-dark">NOX<span>TECH</span></div>
+</div>
+
+<!-- 3. logo-transparente -->
+<div id="logo-transparente" class="asset flex-center" style="background:transparent;">
+    <svg viewBox="0 0 64 64" fill="none" style="width:250px; height:250px;"><use href="#prisma-svg"/></svg>
+    <div class="logo-text-vertical">NOX<span>TECH</span></div>
+</div>
+
+<!-- 4. cartao-frente -->
+<div id="cartao-frente" class="asset flex-center">
+    <svg viewBox="0 0 64 64" fill="none" style="width:200px; height:200px;"><use href="#prisma-svg"/></svg>
+    <div class="logo-text-vertical" style="font-size:60px;">NOX<span>TECH</span></div>
+</div>
+
+<!-- 5. cartao-verso -->
+<div id="cartao-verso" class="asset flex-center">
+    <div class="card-content">
+        <div class="card-details">
+            <h1>LUAN ANDRADE</h1>
+            <h2>CEO & Fundador</h2>
+            <div class="info-line">📞 +1 (612) 633-3722</div>
+            <div class="info-line">✉️ luan@noxtech.io</div>
+            <div class="info-line">🌍 noxtech.io</div>
+        </div>
+        <svg viewBox="0 0 64 64" fill="none" style="width:260px; height:260px; opacity:0.9;"><use href="#prisma-svg-white"/></svg>
+    </div>
+</div>
+
+<!-- 6. email-signature -->
+<div id="email-signature" class="asset">
+    <svg viewBox="0 0 64 64" fill="none" style="width:120px; height:120px;"><use href="#prisma-svg"/></svg>
+    <div class="sig-divider"></div>
+    <div class="sig-info">
+        <h3>Luan Andrade</h3>
+        <p class="role">CEO, Nox Tech</p>
+        <p class="contact">
+            <a href="https://noxtech.io">noxtech.io</a> | 
+            <span>+1 (612) 633-3722</span>
+        </p>
+    </div>
+</div>
+
+<!-- 7. letterhead-a4 -->
+<div id="letterhead-a4" class="asset">
+    <div class="lh-header">
+        <div class="logo-text-horizontal" style="color:#000;">NOX<span>TECH</span></div>
+        <svg viewBox="0 0 64 64" fill="none" style="width:160px; height:160px;"><use href="#prisma-svg-dark"/></svg>
+    </div>
+    <div class="lh-footer">
+        <div>Agência Digital Internacional</div>
+        <div>contato@noxtech.io • +1 (612) 633-3722</div>
+    </div>
+</div>
+
+<!-- 8. profile-pic -->
+<div id="profile-pic" class="asset flex-center">
+    <div class="inner-glow"></div>
+    <svg viewBox="0 0 64 64" fill="none" style="width:600px; height:600px; z-index:2;"><use href="#prisma-svg"/></svg>
+</div>
+
+<!-- 9. banner-social -->
+<div id="banner-social" class="asset flex-center">
+    <div class="banner-content">
+        <div class="banner-tag">Agência Digital Internacional</div>
+        <h1 class="banner-title">Presença premium.<br>Resultados reais.</h1>
+        <div class="logo-text-horizontal" style="margin-top:40px;">
+            <svg viewBox="0 0 64 64" fill="none" style="width:120px; height:120px; margin-right:32px;"><use href="#prisma-svg"/></svg>
+            NOX<span>TECH</span>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Premium Miner — Portugal</title>
+    <!-- Google Fonts for Modern Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    
+    <div class="blob-bg"></div>
+    <div class="blob-bg blob-2"></div>
+
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <aside class="sidebar glass-panel">
+            <div class="logo">
+                <div class="logo-icon">⛏️</div>
+                <h1>Miner<span>PRO</span></h1>
+            </div>
+            
+            <nav class="nav-links">
+                <a href="#" class="active" id="nav-extractor" onclick="switchTab('extractor')"><i class="icon">🔍</i> Extractor Engine</a>
+                <a href="#" id="nav-crm" onclick="switchTab('crm')"><i class="icon">👥</i> CRM / Leads <span class="badge" id="crm-badge" style="margin-left:auto; background:rgba(59,130,246,0.3); color:#60a5fa">0</span></a>
+                <a href="https://docs.google.com/spreadsheets/d/1IZTRE-aYZ1kfMe04fClHWc0JUShlQJxgp51I2_JsKlI" target="_blank"><i class="icon">📑</i> Database (Sheets)</a>
+                <a href="#" id="nav-email" onclick="switchTab('email')"><i class="icon">✉️</i> Mail Automator</a>
+            </nav>
+
+            <div class="status-indicator" style="margin-top:auto">
+                <div class="status-dot" id="system-status-dot"></div>
+                <span id="system-status-text">System Ready</span>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="topbar">
+                <div>
+                    <h2 class="greeting" id="topbar-title">Portugal Extraction Engine</h2>
+                    <p class="subtitle" id="topbar-subtitle">Multi-layer deep scraping powered by AI & Stealth Protocol</p>
+                </div>
+                <div class="topbar-actions">
+                    <button class="btn btn-secondary" onclick="window.location.reload()">↺ Refresh Connection</button>
+                    <div class="badge" id="bot-badge">OFFLINE</div>
+                </div>
+            </header>
+
+            <!-- Extractor View -->
+            <div class="view-section active" id="view-extractor">
+                <div class="grid-layout">
+                    <!-- Controls & Forms -->
+                    <div class="card glass-panel control-panel">
+                        <h3>Extraction Parameters</h3>
+                        
+                        <div class="form-group">
+                            <label>Search Term (Niche)</label>
+                            <input type="text" id="termInput" value="canalizador" placeholder="e.g. obras em casa, pintor">
+                        </div>
+                        
+                        <div class="form-group row">
+                            <div class="col">
+                                <label>Country</label>
+                                <input type="text" id="countryInput" value="Portugal" list="countryList">
+                                <datalist id="countryList">
+                                    <option value="Portugal">
+                                    <option value="Brasil">
+                                    <option value="United States">
+                                    <option value="United Kingdom">
+                                    <option value="Espanha">
+                                    <option value="França">
+                                </datalist>
+                            </div>
+                            <div class="col">
+                                <label>State / Region</label>
+                                <input type="text" id="stateInput" value="" placeholder="e.g. SP, Texas">
+                            </div>
+                        </div>
+
+                        <div class="form-group row">
+                            <div class="col">
+                                <label>City</label>
+                                <input type="text" id="cityInput" value="Lisboa" placeholder="Start typing... (e.g. Cam_)" list="cityList" autocomplete="off">
+                                <datalist id="cityList"></datalist>
+                            </div>
+                            <div class="col">
+                                <label>Daily Limit</label>
+                                <input type="number" id="limitInput" value="150" min="1" max="1000">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Target Neighborhoods (Comma separated)</label>
+                            <textarea id="neighborhoodsInput" rows="3">Lisboa, Cascais, Sintra, Loures, Amadora, Almada, Oeiras</textarea>
+                        </div>
+
+                        <div class="action-buttons">
+                            <button class="btn btn-primary" id="btnStart">▶ Start Miner</button>
+                            <button class="btn btn-warning" id="btnPause" disabled>⏸ Pause</button>
+                            <button class="btn btn-danger" id="btnStop" disabled>⏹ Stop</button>
+                        </div>
+                    </div>
+
+                    <!-- Live Metrics -->
+                    <div class="metrics-grid">
+                        <div class="stat-card glass-panel">
+                            <div class="stat-icon">🎯</div>
+                            <div class="stat-details">
+                                <p>Total Leads Found</p>
+                                <h3 id="stat-leads">0</h3>
+                            </div>
+                        </div>
+                        <div class="stat-card glass-panel">
+                            <div class="stat-icon" style="background: rgba(16, 185, 129, 0.2); color: #10b981;">✉️</div>
+                            <div class="stat-details">
+                                <p>Emails Extracted</p>
+                                <h3 id="stat-emails">0</h3>
+                            </div>
+                        </div>
+                        <div class="stat-card glass-panel">
+                            <div class="stat-icon" style="background: rgba(59, 130, 246, 0.2); color: #3b82f6;">💬</div>
+                            <div class="stat-details">
+                                <p>Socials / Direct</p>
+                                <h3 id="stat-socials">0</h3>
+                            </div>
+                        </div>
+                        <div class="stat-card glass-panel">
+                            <div class="stat-icon" style="background: rgba(139, 92, 246, 0.2); color: #8b5cf6;">🔥</div>
+                            <div class="stat-details">
+                                <p>Conversion Rate</p>
+                                <h3 id="stat-cr">0%</h3>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Deep Log Terminal (Full Width bottom) -->
+                    <div class="terminal-card glass-panel">
+                        <div class="terminal-header">
+                            <div class="mac-dots">
+                                <span class="dot red"></span>
+                                <span class="dot yellow"></span>
+                                <span class="dot green"></span>
+                            </div>
+                            <h4>Deep Scrape Terminal</h4>
+                            <button class="btn-clear" onclick="document.getElementById('terminal-output').innerHTML=''">Clear Logs</button>
+                        </div>
+                        <div class="terminal-output" id="terminal-output">
+                            <div class="log-line info">
+                                <span class="time">[System]</span> 
+                                <span class="msg">Awaiting execution commands. Ready to ignite multi-layer extraction.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div> <!-- End Extractor View -->
+
+            <!-- CRM View -->
+            <div class="view-section" id="view-crm" style="display: none;">
+                <div class="crm-tools glass-panel">
+                    <div class="search-box">
+                        <i class="icon">🔍</i>
+                        <input type="text" id="crm-search" placeholder="Search by name, niche or city..." onkeyup="filterCRM()">
+                    </div>
+                    <button class="btn btn-secondary" onclick="loadLeads()"><i class="icon">🔄</i> Sync Database</button>
+                    <button class="btn btn-primary" onclick="alert('Export to CSV coming soon')"><i class="icon">📥</i> Export CSV</button>
+                </div>
+
+                <div class="crm-table-container glass-panel">
+                    <table class="crm-table">
+                        <thead>
+                            <tr>
+                                <th>Nome & Contato</th>
+                                <th>Email</th>
+                                <th>Social Media</th>
+                                <th>Localização</th>
+                                <th>Reputação</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="crm-tbody">
+                            <tr>
+                                <td colspan="6" style="text-align:center; padding: 40px; color: var(--text-muted);">
+                                    Carregando dados criptografados...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div> <!-- End CRM View -->
+
+            <!-- Email Marketing View -->
+            <div class="view-section" id="view-email" style="display: none;">
+                <div class="grid-layout">
+                    <!-- Composer -->
+                    <div class="card glass-panel control-panel">
+                        <h3>Compositor de Campanha</h3>
+                        <p style="color:var(--text-muted);font-size:13px;margin-bottom:16px;">Deixe os campos vazios para usar a copy personalizada da IA por lead (colunas N/O da planilha).</p>
+
+                        <div class="form-group">
+                            <label>Assunto (opcional)</label>
+                            <input type="text" id="email-subject" placeholder="Deixe vazio para usar copy individual da IA">
+                        </div>
+                        <div class="form-group" style="margin-top:12px;">
+                            <label>Corpo do Email (opcional)</label>
+                            <textarea id="email-body" rows="7" placeholder="Deixe vazio para usar copy individual da IA"></textarea>
+                        </div>
+
+                        <div class="action-buttons" style="margin-top:16px;">
+                            <button class="btn btn-primary" id="btnEmailStart">▶ Disparar</button>
+                            <button class="btn btn-warning" id="btnEmailPause" disabled>⏸ Pausar</button>
+                            <button class="btn btn-danger" id="btnEmailStop" disabled>⏹ Parar</button>
+                        </div>
+                    </div>
+
+                    <!-- Stats -->
+                    <div class="metrics-grid" style="grid-template-columns: repeat(2, 1fr);">
+                        <div class="stat-card glass-panel">
+                            <div class="stat-icon" style="background:rgba(16,185,129,0.2);color:#10b981;">✉️</div>
+                            <div class="stat-details">
+                                <p>Enviados Hoje</p>
+                                <h3 id="email-stat-sent">0</h3>
+                            </div>
+                        </div>
+                        <div class="stat-card glass-panel">
+                            <div class="stat-icon" style="background:rgba(245,158,11,0.2);color:#f59e0b;">📋</div>
+                            <div class="stat-details">
+                                <p>Limite Diário</p>
+                                <h3 id="email-stat-limit">40</h3>
+                            </div>
+                        </div>
+                        <div class="stat-card glass-panel">
+                            <div class="stat-icon" style="background:rgba(59,130,246,0.2);color:#3b82f6;">👥</div>
+                            <div class="stat-details">
+                                <p>Leads com Email</p>
+                                <h3 id="email-stat-leads">—</h3>
+                            </div>
+                        </div>
+                        <div class="stat-card glass-panel">
+                            <div class="stat-icon" style="background:rgba(139,92,246,0.2);color:#8b5cf6;">🤖</div>
+                            <div class="stat-details">
+                                <p>Com Copy da IA</p>
+                                <h3 id="email-stat-ai">—</h3>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Email Log Terminal -->
+                    <div class="terminal-card glass-panel">
+                        <div class="terminal-header">
+                            <div class="mac-dots">
+                                <span class="dot red"></span>
+                                <span class="dot yellow"></span>
+                                <span class="dot green"></span>
+                            </div>
+                            <h4>Email Dispatch Log</h4>
+                            <button class="btn-clear" onclick="document.getElementById('email-terminal').innerHTML=''">Clear</button>
+                        </div>
+                        <div class="terminal-output" id="email-terminal">
+                            <div class="log-line info">
+                                <span class="time">[System]</span>
+                                <span class="msg">Email automator pronto. Configure e dispare.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div> <!-- End Email View -->
+
+            <!-- Copy Modal -->
+            <div id="copyModal" class="modal" style="display:none;">
+                <div class="modal-content glass-panel" style="max-height: 90vh; overflow-y: auto;">
+                    <span class="close-modal" onclick="closeModal()">&times;</span>
+                    <h3>🤖 Painel de Vendas <br><span id="modal-lead-name" style="font-size:16px;color:var(--text-muted)"></span></h3>
+                    
+                    <div id="modal-diagnostico-container" style="margin-top:20px; padding:12px; border-radius:8px; background:rgba(239, 68, 68, 0.1); border:1px solid rgba(239, 68, 68, 0.3); display:none;">
+                        <h5 style="color:#ef4444; margin-bottom:8px;">🔍 Auditoria Técnica de Site</h5>
+                        <p id="modal-diagnostico" style="font-size:13px; line-height:1.6; color:#fca5a5;"></p>
+                    </div>
+
+                    <div class="form-group" style="margin-top:20px;">
+                        <label>Assunto (Sugerido pela IA)</label>
+                        <input type="text" id="modal-assunto" readonly>
+                    </div>
+                    <div class="form-group" style="margin-top:10px;">
+                        <label>Mensagem (Copy Persuasiva)</label>
+                        <textarea id="modal-copy" rows="8" readonly></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="copyToClipboard()" style="margin-top:16px;">📋 Copiar para a Área de Transferência</button>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Required Scripts -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,8 +1,8 @@
 /**
- * Ireland Business Miner — Google Maps + Google Sheets
+ * Portugal Business Miner — Google Maps + Google Sheets
  * Todos os tipos de negocio sem website — filtro: >= 4.0 estrelas, >= 20 avaliacoes
  * Playwright + googleapis
- * Usage: node minerar-ireland.js
+ * Usage: node minerar-portugal.js
  */
 
 require("dotenv").config();
@@ -17,62 +17,40 @@ const fs = require("fs");
 // =============================================
 // CONFIGURACOES
 // =============================================
-const CIDADES_IRELAND = [
-  {
-    cidade: "Dublin",
-    bairros: ["Dublin 1", "Dublin 2", "Dublin 4", "Dublin 6", "Dublin 8", "Tallaght", "Blanchardstown", "Swords"]
-  },
-  {
-    cidade: "Cork",
-    bairros: ["Cork City", "Ballincollig", "Bishopstown"]
-  },
-  {
-    cidade: "Galway",
-    bairros: ["Galway City", "Salthill", "Tuam"]
-  },
-  {
-    cidade: "Limerick",
-    bairros: ["Limerick City", "Castletroy"]
-  },
-  {
-    cidade: "Waterford",
-    bairros: ["Waterford City"]
-  },
-  {
-    cidade: "Kilkenny",
-    bairros: ["Kilkenny City", "Callan"]
-  },
-  {
-    cidade: "Drogheda",
-    bairros: ["Drogheda Town", "Moneymore"]
-  },
+const CIDADES_PORTUGAL = [
+  { cidade: "Lisboa", bairros: ["Lisboa", "Cascais", "Sintra", "Loures", "Amadora", "Almada", "Oeiras", "Odivelas"] },
+  { cidade: "Porto", bairros: ["Porto", "Vila Nova de Gaia", "Matosinhos", "Maia", "Gondomar", "Valongo"] },
+  { cidade: "Braga", bairros: ["Braga", "Guimarães", "Vila Nova de Famalicão", "Barcelos"] },
+  { cidade: "Setúbal", bairros: ["Setúbal", "Seixal", "Barreiro", "Palmela", "Sesimbra"] },
+  { cidade: "Aveiro", bairros: ["Aveiro", "Santa Maria da Feira", "Ovar", "Ílhavo"] },
+  { cidade: "Faro", bairros: ["Faro", "Portimão", "Loulé", "Albufeira", "Lagos", "Olhão", "Tavira"] },
+  { cidade: "Coimbra", bairros: ["Coimbra", "Figueira da Foz", "Cantanhede"] },
+  { cidade: "Leiria", bairros: ["Leiria", "Caldas da Rainha", "Alcobaça", "Marinha Grande"] }
 ];
 
-// Nichos por categoria — percorre todos em sequência no mesmo workflow
-const TERMOS_IRELAND = process.env.TERMO_IRELAND
-  ? [process.env.TERMO_IRELAND]
+const TERMOS_PORTUGAL = process.env.TERMO_PORTUGAL
+  ? [process.env.TERMO_PORTUGAL]
   : [
-    // Plumbing
-    "plumber", "plumbing service", "heating engineer", "boiler repair",
-    // Electrical
-    "electrician", "electrical contractor", "electrical services",
-    // Construction & Trades
-    "builder", "construction company", "general contractor",
-    "roofer", "roofing contractor",
-    "carpenter", "joinery",
-    "painter decorator",
-    "plasterer",
-    "tiler",
-    "driveway contractor",
+    "canalizador", "desentupimentos",
+    "eletricista",
+    "pedreiro", "obras em casa", "reparações domésticas",
+    "pintor", "pinturas de edifícios",
+    "carpinteiro", "marceneiro",
+    "caixilharia", "vidraceiro",
+    "serralharia", "bate-chapas",
+    "empresas de mudanças", "transportes locais",
+    "jardinagem", "limpeza de terrenos",
+    "instalação de pladur", "tetos falsos"
   ];
 
 const CONFIG = {
   credenciaisPath: path.join(__dirname, "credentials.json"),
-  sheetId: process.env.SHEET_ID_IRELAND || "",
-  sheetNome: process.env.SHEET_ABA_IRELAND || "Leads-Ireland",
+  sheetId: process.env.SHEET_ID_PORTUGAL || "",
+  sheetNome: process.env.SHEET_ABA_PORTUGAL || "Leads-Portugal",
 
-  minEstrelas: Number(process.env.MIN_ESTRELAS) || 4.0,
-  minAvaliacoes: Number(process.env.MIN_AVALIACOES) || 20,
+  minEstrelas: Number(process.env.MIN_ESTRELAS) || 3.8, // Empresas menores podem não ter nota perfeita ainda
+  minAvaliacoes: Number(process.env.MIN_AVALIACOES) || 5, // Abaixado para capturar pequenos
+  maxAvaliacoes: Number(process.env.MAX_AVALIACOES) || 80, // Descarta se tiver > 80 (geralmente empresas consolidadas)
 
   maxScroll: 6,
   headless: true,
@@ -82,7 +60,7 @@ const CONFIG = {
   limiteDiario: Number(process.env.LIMITE_DIARIO) || 200,
 };
 
-const PROGRESSO_PATH = path.join(__dirname, "progresso-ireland.json");
+const PROGRESSO_PATH = path.join(__dirname, "progresso-portugal.json");
 
 function carregarProgresso() {
   try {
@@ -103,15 +81,16 @@ function limparProgresso() {
 
 const NAO = "Não encontrado";
 
-// County (condado) por cidade
-const COUNTY_MAP = {
-  "Dublin":    "Co. Dublin",
-  "Cork":      "Co. Cork",
-  "Galway":    "Co. Galway",
-  "Limerick":  "Co. Limerick",
-  "Waterford": "Co. Waterford",
-  "Kilkenny":  "Co. Kilkenny",
-  "Drogheda":  "Co. Louth",
+// Distrito (condado) por cidade
+const DISTRITO_MAP = {
+  "Lisboa": "Lisboa",
+  "Porto": "Porto",
+  "Braga": "Braga",
+  "Setúbal": "Setúbal",
+  "Aveiro": "Aveiro",
+  "Faro": "Faro",
+  "Coimbra": "Coimbra",
+  "Leiria": "Leiria",
 };
 
 // =============================================
@@ -129,7 +108,7 @@ const CABECALHO = [
   "Rua",                  // H  ← oculta por padrão
   "Área / Bairro",        // I
   "Cidade",               // J
-  "County",               // K
+  "Distrito",               // K
   "Avaliação Google ⭐",  // L
   "Nº Avaliações",        // M
   "Link Maps",            // N
@@ -176,12 +155,12 @@ function formatarTelefone(raw) {
 
 // Domínios de diretórios — presença aqui NÃO significa que o negócio tem site próprio
 const DIRETORIOS = [
-  "yelp.com", "goldenpages.ie", "trustpilot.com", "facebook.com", "instagram.com",
-  "linkedin.com", "twitter.com", "x.com", "yellowpages.ie", "businessfinder.ie",
-  "google.com", "maps.google", "ie.trustpilot.com", "cylex.ie", "hotfrog.ie",
-  "local.ie", "brownbook.net", "foursquare.com", "tripadvisor.com", "bark.com",
-  "checkatrade.com", "rated.ie", "ratedpeople.com", "mybuilder.com", "yell.com",
-  "bizify.ie", "kompass.com", "dnb.com", "companieshouse.gov.uk", "vision-net.ie",
+  "yelp.com", "goldenpages.pt", "trustpilot.com", "facebook.com", "instagram.com",
+  "linkedin.com", "twitter.com", "x.com", "yellowpages.pt", "businessfinder.pt",
+  "google.com", "maps.google", "ie.trustpilot.com", "cylex.pt", "hotfrog.pt",
+  "local.pt", "brownbook.net", "foursquare.com", "tripadvisor.com", "bark.com",
+  "checkatrade.com", "rated.pt", "ratedpeople.com", "mybuilder.com", "yell.com",
+  "bizify.pt", "kompass.com", "dnb.com", "companieshouse.gov.uk", "vision-net.pt",
 ];
 
 function ehDiretorio(url) {
@@ -205,8 +184,8 @@ function extrairEmail(html) {
     "privacy@", "legal@", "dmca@", "spam@", "phishing@"];
   const matches = html.match(regex) || [];
   const candidatos = matches.filter(e => !ignorar.some(i => e.toLowerCase().includes(i)));
-  // Prefere emails com domínio .ie, depois gmail/hotmail, depois qualquer outro
-  return candidatos.find(e => e.endsWith(".ie"))
+  // Prefere emails com domínio .pt, depois gmail/hotmail, depois qualquer outro
+  return candidatos.find(e => e.endsWith(".pt"))
     || candidatos.find(e => e.includes("@gmail") || e.includes("@hotmail") || e.includes("@outlook"))
     || candidatos[0]
     || "";
@@ -265,7 +244,7 @@ async function verificarWebResults(page) {
 
     // Todos são diretórios — pega o primeiro para scraping de email
     // Prioriza Golden Pages (maior diretório da Irlanda)
-    const goldenPages = unicos.find(u => u.includes("goldenpages.ie"));
+    const goldenPages = unicos.find(u => u.includes("goldenpages.pt"));
     const urlDiretorio = goldenPages || unicos[0] || null;
 
     return { temSiteProprio: false, urlDiretorio };
@@ -285,8 +264,8 @@ async function buscarEmailNoSite(url) {
 
 async function buscarEmailViaDuckDuckGo(nome, cidade) {
   const queries = [
-    `"${nome}" email ${cidade} Ireland`,
-    `"${nome}" contact ${cidade} Ireland`,
+    `"${nome}" email ${cidade} Portugal`,
+    `"${nome}" contact ${cidade} Portugal`,
   ];
   for (const q of queries) {
     try {
@@ -304,7 +283,7 @@ async function buscarEmailViaDuckDuckGo(nome, cidade) {
 
 async function buscarFacebookViaBusca(nome, cidade) {
   try {
-    const q = encodeURIComponent(`"${nome}" facebook ${cidade} Ireland`);
+    const q = encodeURIComponent(`"${nome}" facebook ${cidade} Portugal`);
     const html = await comTimeout(
       httpsGet(`https://html.duckduckgo.com/html/?q=${q}`),
       8000
@@ -358,17 +337,27 @@ async function tentarEmailGuessing(nomeBusiness, dominio) {
 // ─── Bing Search para site próprio ──────────────────────────
 async function buscarSiteViaBing(nome, cidade) {
   try {
-    // Busca específica por site .ie com nome do negócio
-    const q = encodeURIComponent(`"${nome}" ${cidade} Ireland site:.ie`);
-    const html = await comTimeout(
-      httpsGet(`https://www.bing.com/search?q=${q}&setlang=en-IE&cc=IE`),
+    // Busca 1: site .pt especifico
+    const q1 = encodeURIComponent(`"${nome}" ${cidade} Portugal site:.pt`);
+    const html1 = await comTimeout(
+      httpsGet(`https://www.bing.com/search?q=${q1}&setlang=pt-PT&cc=IE`),
       8000
     );
-    // Extrai URLs .ie dos resultados
-    const regex = /https?:\/\/(?:www\.)?([a-zA-Z0-9\-]+\.ie)(?:\/[^\s"<]*)?/g;
-    const matches = [...(html.matchAll(regex) || [])].map(m => m[0]);
-    const urlPropria = matches.find(u => !ehDiretorio(u));
-    return urlPropria || "";
+    const regex = /https?:\/\/(?:www\.)?([a-zA-Z0-9\-]+\.pt)(?:\/[^\s"<]*)?/g;
+    const matches1 = [...(html1.matchAll(regex) || [])].map(m => m[0]);
+    const urlPropria1 = matches1.find(u => !ehDiretorio(u));
+    if (urlPropria1) return urlPropria1;
+
+    // Busca 2: sem restricao de dominio — pega qualquer site proprio
+    const q2 = encodeURIComponent(`${nome} ${cidade} Portugal driving`);
+    const html2 = await comTimeout(
+      httpsGet(`https://www.bing.com/search?q=${q2}&setlang=pt-PT&cc=IE`),
+      8000
+    );
+    const urlRegex = /https?:\/\/(?:www\.)?([a-zA-Z0-9\-]+\.[a-z]{2,})(?:\/[^\s"<]*)?/g;
+    const matches2 = [...(html2.matchAll(urlRegex) || [])].map(m => m[0]);
+    const urlPropria2 = matches2.find(u => !ehDiretorio(u) && !u.includes("bing.com") && !u.includes("microsoft.com"));
+    return urlPropria2 || "";
   } catch (_) {
     return "";
   }
@@ -377,10 +366,10 @@ async function buscarSiteViaBing(nome, cidade) {
 // ─── Golden Pages Estruturado ────────────────────────────────
 async function buscarGoldenPagesDireto(nome, cidade) {
   try {
-    // goldenpages.ie tem estrutura de busca por termo + localização
+    // goldenpages.pt tem estrutura de busca por termo + localização
     const nomeCodificado = encodeURIComponent(nome);
     const cidadeCodificada = encodeURIComponent(cidade);
-    const url = `https://www.goldenpages.ie/q-business+local-where-${cidadeCodificada}-adtype-paid-what-${nomeCodificado}`;
+    const url = `https://www.goldenpages.pt/q-business+local-where-${cidadeCodificada}-adtype-paid-what-${nomeCodificado}`;
     const html = await comTimeout(httpsGet(url), 5000);
 
     // Tenta extrair email e website da página de resultado
@@ -457,7 +446,7 @@ async function garantirCabecalho(sheets) {
       const cidade = r[4] || "";
       return inserirNicho([
         r[11] || "Not Contacted",  r[0] || "", r[1] || "", r[9] || "", r[10] || "",
-        r[2] || "", r[3] || "", "", cidade, COUNTY_MAP[cidade] || "",
+        r[2] || "", r[3] || "", "", cidade, DISTRITO_MAP[cidade] || "",
         r[6] || "", r[7] || "", "", r[12] || "", r[13] || "",
       ]);
     });
@@ -474,7 +463,7 @@ async function garantirCabecalho(sheets) {
       const cidade = r[7] || "";
       return inserirNicho([
         r[0] || "Not Contacted", r[1] || "", r[2] || "", r[3] || "", r[4] || "",
-        r[5] || "", r[6] || "", "", cidade, COUNTY_MAP[cidade] || "",
+        r[5] || "", r[6] || "", "", cidade, DISTRITO_MAP[cidade] || "",
         r[8] || "", r[9] || "", "", r[10] || "", r[11] || "",
       ]);
     });
@@ -491,7 +480,7 @@ async function garantirCabecalho(sheets) {
       const cidade = r[7] || "";
       return inserirNicho([
         r[0] || "Not Contacted", r[1] || "", r[2] || "", r[3] || "", r[4] || "",
-        r[5] || "", r[6] || "", "", cidade, COUNTY_MAP[cidade] || "",
+        r[5] || "", r[6] || "", "", cidade, DISTRITO_MAP[cidade] || "",
         r[8] || "", r[9] || "", r[10] || "", r[11] || "", r[12] || "",
       ]);
     });
@@ -504,8 +493,8 @@ async function garantirCabecalho(sheets) {
     }).catch(() => null);
 
     const linhas = dadosRes?.data?.values || [];
-    // v4: A=Status B=Nome C=Tel D=Email E=FB F=Website G=Rua H=Área I=Cidade J=County K=Aval L=NºAval M=Maps N=Data O=Obs
-    // v5: A=Status B=Nome C=Nicho D=Tel E=Email F=FB G=Website H=Rua I=Área J=Cidade K=County L=Aval M=NºAval N=Maps O=Data P=Obs
+    // v4: A=Status B=Nome C=Tel D=Email E=FB F=Website G=Rua H=Área I=Cidade J=Distrito K=Aval L=NºAval M=Maps N=Data O=Obs
+    // v5: A=Status B=Nome C=Nicho D=Tel E=Email F=FB G=Website H=Rua I=Área J=Cidade K=Distrito L=Aval M=NºAval N=Maps O=Data P=Obs
     dadosMigrados = linhas.map(r => inserirNicho([
       r[0]||"Not Contacted", r[1]||"", r[2]||"", r[3]||"", r[4]||"",
       r[5]||"", r[6]||"", r[7]||"", r[8]||"", r[9]||"",
@@ -662,11 +651,11 @@ function formatarLinha(lead) {
     val(lead.rua),                                         // H Rua (oculta)
     val(lead.area),                                        // I Área / Bairro
     val(lead.cidade),                                      // J Cidade
-    val(lead.county),                                      // K County
+    val(lead.county),                                      // K Distrito
     lead.avaliacao || NAO,                                 // L Avaliação
     lead.reviews || NAO,                                   // M Nº Avaliações
     val(lead.mapsLink),                                    // N Link Maps
-    new Date().toLocaleDateString("en-IE"),                // O Data
+    new Date().toLocaleDateString("pt-PT"),                // O Data
     "",                                                    // P Observações
   ];
 }
@@ -745,7 +734,7 @@ async function extrairDadosPlace(page) {
 }
 
 async function rasparBairro(page, bairro, cidade, termo) {
-  const query = encodeURIComponent(`${termo} in ${bairro} ${cidade} Ireland`);
+  const query = encodeURIComponent(`${termo} em ${bairro}, ${cidade}, Portugal`);
   const links = new Set();
 
   await page.goto(`https://www.google.com/maps/search/${query}?hl=en`, { waitUntil: "domcontentloaded", timeout: 30000 });
@@ -762,7 +751,7 @@ async function rasparBairro(page, bairro, cidade, termo) {
     if (s < CONFIG.maxScroll) {
       await feed.evaluate(el => el.scrollBy(0, 1000)).catch(() => page.evaluate(() => window.scrollBy(0, 1000)));
       await sleep(700, 1100);
-      const fim = await page.locator('text="You\'ve reached the end of the list."').isVisible().catch(() => false);
+      const fim = await page.locator('text="You\'ve reached the end of the list.", text="Chegou ao fim da lista.", text="Chegaste ao fim da lista.", text="Você chegou ao fim da lista."').isVisible().catch(() => false);
       if (fim) break;
     }
   }
@@ -787,11 +776,11 @@ async function processarLink(page, link, area, cidade, nicho, chavesVistas, chav
     const webResults = await verificarWebResults(page).catch(() => ({ temSiteProprio: false, urlDiretorio: null }));
     if (webResults.temSiteProprio) return null;
 
-    // Filtro de qualidade: minimo de estrelas e avaliacoes
+    // Filtro para pequenos empreendedores: min 5, max 80 opiniões
     const estrelas = parseFloat(dados.avaliacao);
     const numAvaliacoes = parseInt(dados.reviews);
     if (isNaN(estrelas) || estrelas < CONFIG.minEstrelas) return null;
-    if (isNaN(numAvaliacoes) || numAvaliacoes < CONFIG.minAvaliacoes) return null;
+    if (isNaN(numAvaliacoes) || numAvaliacoes < CONFIG.minAvaliacoes || numAvaliacoes > CONFIG.maxAvaliacoes) return null;
 
     const chaveNome = `${dados.nome}|${dados.endereco}`;
     const chaveTel = dados.telefone ? dados.telefone.replace(/\D/g, "") : "";
@@ -800,7 +789,7 @@ async function processarLink(page, link, area, cidade, nicho, chavesVistas, chav
     if (chavesVistas.has(chave) || chavesExistentes.has(chaveTel) || chavesExistentes.has(chaveNome)) return null;
     chavesVistas.add(chave);
 
-    const county = COUNTY_MAP[cidade] || `Co. ${cidade}`;
+    const county = DISTRITO_MAP[cidade] || `Distrito de ${cidade}`;
     const lead = { ...dados, nicho, rua: dados.endereco, area, cidade, county, mapsLink: link, email: NAO, facebook: NAO };
     let dominioEncontrado = "";
 
@@ -821,7 +810,7 @@ async function processarLink(page, link, area, cidade, nicho, chavesVistas, chav
       if (gp.website && !dominioEncontrado) dominioEncontrado = extrairDominio(gp.website);
     }
 
-    // CAMADA 4: Bing busca site .ie próprio não linkado no Maps
+    // CAMADA 4: Bing busca site .pt próprio não linkado no Maps
     if (!dominioEncontrado) {
       const siteViBing = await buscarSiteViaBing(dados.nome, area).catch(() => "");
       if (siteViBing) {
@@ -861,16 +850,16 @@ async function processarLink(page, link, area, cidade, nicho, chavesVistas, chav
 // MAIN
 // =============================================
 async function main() {
-  const listaCidades = CIDADES_IRELAND;
+  const listaCidades = CIDADES_PORTUGAL;
   const totalBairrosGeral = listaCidades.reduce((acc, c) => acc + c.bairros.length, 0);
 
   console.log("\n");
   console.log("  ╔══════════════════════════════════════╗");
-  console.log("  ║     IRELAND TRADES MINER             ║");
+  console.log("  ║     PORTUGAL TRADES MINER             ║");
   console.log("  ║     Trades with no website → Sheets  ║");
   console.log("  ╚══════════════════════════════════════╝");
-  console.log(`\n  Nichos:  ${TERMOS_IRELAND.length} termos (plumbing, electrical, construction)`);
-  console.log(`  Filtro:  no website | >= ${CONFIG.minEstrelas} stars | >= ${CONFIG.minAvaliacoes} reviews`);
+  console.log(`\n  Nichos:  ${TERMOS_PORTUGAL.length} termos (plumbing, electrical, construction)`);
+  console.log(`  Filtro:  no website | >= ${CONFIG.minEstrelas} stars | reviews entre ${CONFIG.minAvaliacoes} e ${CONFIG.maxAvaliacoes} (Foco Pequenos Empreendedores)`);
   console.log(`  Cidades: ${listaCidades.length} | Bairros: ${totalBairrosGeral} | Limite: ${CONFIG.limiteDiario}\n`);
   console.log("  ──────────────────────────────────────");
 
@@ -883,7 +872,7 @@ async function main() {
     args: [
       "--no-sandbox",
       "--disable-blink-features=AutomationControlled",
-      "--lang=en-IE",
+      "--lang=pt-PT",
       "--disable-dev-shm-usage",
       "--disable-extensions",
       "--disable-background-networking",
@@ -892,8 +881,8 @@ async function main() {
 
   const criarPagina = async () => {
     const ctx = await browser.newContext({
-      locale: "en-IE",
-      timezoneId: "Europe/Dublin",
+      locale: "pt-PT",
+      timezoneId: "Europe/Lisbon",
       userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
       viewport: { width: 1280, height: 900 }
     });
@@ -916,8 +905,8 @@ async function main() {
   const progresso = carregarProgresso();
   const termoInicio = progresso.termoIdx || 0;
 
-  mainLoop: for (let ti = termoInicio; ti < TERMOS_IRELAND.length; ti++) {
-    const termo = TERMOS_IRELAND[ti];
+  mainLoop: for (let ti = termoInicio; ti < TERMOS_PORTUGAL.length; ti++) {
+    const termo = TERMOS_PORTUGAL[ti];
     console.log(`\n  ════════════════════════════════════`);
     console.log(`  NICHO: ${termo.toUpperCase()}`);
     console.log(`  ════════════════════════════════════`);

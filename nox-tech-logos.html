@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nox Tech - Logo Concepts</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800;900&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #060a08;
+            --bg-2: #0a0f0c;
+            --bg-3: #0f1a13;
+            --accent: #10b981;
+            --accent-l: #34d399;
+            --accent-2: #6ee7b7;
+            --text: #f0fdf4;
+            --text-s: #94a3b8;
+            --border: rgba(16, 185, 129, 0.15);
+        }
+        
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        
+        body {
+            font-family: 'Manrope', sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            padding: 40px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .header h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: 42px;
+            font-weight: 900;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: var(--text-s);
+            font-size: 16px;
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, var(--accent-l) 0%, var(--accent-2) 55%, #c7fce4 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 40px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .logo-card {
+            background: var(--bg-2);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .logo-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .logo-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(16, 185, 129, 0.4);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5), 0 0 40px rgba(16, 185, 129, 0.1);
+        }
+
+        .logo-card:hover::before {
+            opacity: 1;
+        }
+
+        .logo-display {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
+        .logo-text {
+            font-family: 'Syne', sans-serif;
+            font-size: 36px;
+            font-weight: 900;
+            letter-spacing: -0.02em;
+            color: #f0fdf4;
+            display: flex;
+            align-items: baseline;
+        }
+
+        .logo-text span {
+            color: var(--accent);
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: 0.05em;
+            margin-left: 6px;
+        }
+
+        .logo-name {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-s);
+            font-weight: 700;
+            text-align: center;
+        }
+
+        .svg-container {
+            width: 64px;
+            height: 64px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .svg-defs { display: none; }
+    </style>
+</head>
+<body>
+
+    <svg class="svg-defs">
+        <defs>
+            <linearGradient id="emerald-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#34d399" />
+                <stop offset="100%" stop-color="#10b981" />
+            </linearGradient>
+            <linearGradient id="emerald-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#6ee7b7" />
+                <stop offset="100%" stop-color="#059669" />
+            </linearGradient>
+        </defs>
+    </svg>
+
+    <div class="header">
+        <h1>Conceitos de Marca <span class="gradient-text">Nox Tech</span></h1>
+        <p>Variações de logotipo em SVG baseadas no design system da sua agência.</p>
+    </div>
+
+    <div class="gallery">
+        
+        <!-- Concept 1: Original Enhanced (O Hexágono Evoluído) -->
+        <div class="logo-card">
+            <div class="logo-display">
+                <div class="svg-container">
+                    <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+                        <polygon points="18,1 33,9 33,27 18,35 3,27 3,9" fill="rgba(16,185,129,0.05)" stroke="url(#emerald-grad)" stroke-width="2"/>
+                        <polygon points="18,6 28,11.5 28,24.5 18,30 8,24.5 8,11.5" fill="rgba(16,185,129,0.15)" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4 2"/>
+                        <path d="M14 12 L14 24 L22 12 L22 24" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div class="logo-text">NOX<span>TECH</span></div>
+            </div>
+            <div class="logo-name">01. O Hexágono Evoluído (Atual Melhorado)</div>
+        </div>
+
+        <!-- Concept 2: The Tech Node (Conexão Neural) -->
+        <div class="logo-card">
+            <div class="logo-display">
+                <div class="svg-container">
+                    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+                        <circle cx="16" cy="48" r="6" fill="#10b981"/>
+                        <circle cx="16" cy="16" r="6" fill="#10b981"/>
+                        <circle cx="48" cy="48" r="6" fill="#10b981"/>
+                        <circle cx="48" cy="16" r="6" fill="#10b981"/>
+                        <path d="M16 22 L16 42" stroke="url(#emerald-grad)" stroke-width="4" stroke-linecap="round"/>
+                        <path d="M48 22 L48 42" stroke="url(#emerald-grad)" stroke-width="4" stroke-linecap="round"/>
+                        <path d="M20 20 L44 44" stroke="#ffffff" stroke-width="4" stroke-linecap="round"/>
+                        <circle cx="32" cy="32" r="4" fill="#6ee7b7" filter="drop-shadow(0 0 4px #10b981)"/>
+                    </svg>
+                </div>
+                <div class="logo-text">NOX<span>TECH</span></div>
+            </div>
+            <div class="logo-name">02. Conexão Digital (Nodes)</div>
+        </div>
+
+        <!-- Concept 3: The Isometric Prism (Premium 3D) -->
+        <div class="logo-card">
+            <div class="logo-display">
+                <div class="svg-container">
+                    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+                        <path d="M32 4 L56 18 L56 46 L32 60 L8 46 L8 18 Z" fill="rgba(16,185,129,0.05)" stroke="#10b981" stroke-width="2"/>
+                        <path d="M32 4 L32 32 L56 46" stroke="#34d399" stroke-width="2"/>
+                        <path d="M32 32 L8 46" stroke="#059669" stroke-width="2"/>
+                        <!-- N Shape wrapping around the 3D planes -->
+                        <path d="M16 22 L16 38 L32 48 L32 32 Z" fill="#10b981"/>
+                        <path d="M32 16 L48 26 L48 42 L32 32 Z" fill="rgba(255,255,255,0.9)"/>
+                    </svg>
+                </div>
+                <div class="logo-text">NOX<span>TECH</span></div>
+            </div>
+            <div class="logo-name">03. Prisma Isométrico</div>
+        </div>
+
+        <!-- Concept 4: The Orbital Globe (Internacional) -->
+        <div class="logo-card">
+            <div class="logo-display">
+                <div class="svg-container">
+                    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+                        <circle cx="32" cy="32" r="28" stroke="rgba(16,185,129,0.2)" stroke-width="2"/>
+                        <ellipse cx="32" cy="32" rx="14" ry="28" stroke="url(#emerald-grad)" stroke-width="2" transform="rotate(30 32 32)"/>
+                        <ellipse cx="32" cy="32" rx="14" ry="28" stroke="#10b981" stroke-width="2" transform="rotate(-30 32 32)"/>
+                        <path d="M22 22 L22 42 L42 22 L42 42" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div class="logo-text">NOX<span>TECH</span></div>
+            </div>
+            <div class="logo-name">04. Esfera Orbital (Global)</div>
+        </div>
+
+        <!-- Concept 5: Minimalist Slashes (Código) -->
+        <div class="logo-card">
+            <div class="logo-display">
+                <div class="svg-container">
+                    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+                        <path d="M16 52 L28 12" stroke="#10b981" stroke-width="6" stroke-linecap="round"/>
+                        <path d="M24 12 L40 52" stroke="#ffffff" stroke-width="6" stroke-linecap="round"/>
+                        <path d="M36 52 L48 12" stroke="url(#emerald-glow)" stroke-width="6" stroke-linecap="round"/>
+                        <rect x="8" y="28" width="8" height="8" rx="2" fill="#34d399"/>
+                    </svg>
+                </div>
+                <div class="logo-text">NOX<span>TECH</span></div>
+            </div>
+            <div class="logo-name">05. Código Minimalista</div>
+        </div>
+
+        <!-- Concept 6: The Digital Shield (Confiança & Autoridade) -->
+        <div class="logo-card">
+            <div class="logo-display">
+                <div class="svg-container">
+                    <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">
+                        <path d="M32 4 L56 14 V34 C56 48 45 58 32 62 C19 58 8 48 8 34 V14 L32 4 Z" fill="rgba(16,185,129,0.05)" stroke="url(#emerald-grad)" stroke-width="3"/>
+                        <path d="M32 8 L50 16 V32 C50 43 42 51 32 55 C22 51 14 43 14 32 V16 L32 8 Z" stroke="rgba(16,185,129,0.3)" stroke-width="1.5" stroke-dasharray="4 4"/>
+                        <path d="M24 24 L24 40 L40 24 L40 40" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div class="logo-text">NOX<span>TECH</span></div>
+            </div>
+            <div class="logo-name">06. Escudo Digital (Autoridade)</div>
+        </div>
+
+        <!-- Concept 7: App Icon (Ícone Nativo) -->
+        <div class="logo-card">
+            <div class="logo-display">
+                <div class="svg-container" style="width: auto;">
+                    <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="height: 64px; width: 64px;">
+                        <rect width="40" height="40" rx="12" fill="url(#emerald-grad)"/>
+                        <path d="M12 10 L12 30 L28 10 L28 30" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <div class="logo-text">NOX<span>TECH</span></div>
+            </div>
+            <div class="logo-name">07. App Icon (Mobile)</div>
+        </div>
+
+    </div>
+
+</body>
+</html>

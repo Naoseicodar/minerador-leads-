@@ -1,0 +1,12 @@
+<svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <!-- Fundo isométrico translúcido do cubo -->
+    <path d="M32 4 L56 18 L56 46 L32 60 L8 46 L8 18 Z" fill="rgba(16,185,129,0.05)" stroke="#10b981" stroke-width="2"/>
+    
+    <!-- Eixos internos dividindo o prisma superior e as faces -->
+    <path d="M32 4 L32 32 L56 46" stroke="#34d399" stroke-width="2"/>
+    <path d="M32 32 L8 46" stroke="#059669" stroke-width="2"/>
+    
+    <!-- Letra 'N' tridimensional contornando as faces frontais do prisma -->
+    <path d="M16 22 L16 38 L32 48 L32 32 Z" fill="#10b981"/>
+    <path d="M32 16 L48 26 L48 42 L32 32 Z" fill="rgba(255,255,255,0.9)"/>
+</svg>

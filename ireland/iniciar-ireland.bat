@@ -8,5 +8,5 @@ npx playwright install chromium --quiet 2>nul
 echo  OK!
 echo.
 
-node minerar-ireland.js
+node ireland\minerar-ireland.js
 pause

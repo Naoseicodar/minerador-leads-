@@ -191,22 +191,23 @@ const NAO = "Não encontrado";
 // CABECALHO (12 colunas)
 // =============================================
 const CABECALHO = [
-  "Status do Lead",       // A  ← primeiro para acompanhamento imediato
-  "Nome da Empresa",      // B
-  "Telefone",             // C
-  "Email",                // D
-  "Instagram",            // E
-  "Website",              // F
-  "Endereço",             // G
-  "Bairro",               // H
-  "Avaliação Google ⭐",  // I
-  "Nº Avaliações",        // J
-  "Link Maps",            // K
-  "Data da Busca",        // L
-  "Observações",          // M
+  "Status do Lead",       // A
+  "CNPJ",                 // B
+  "Nome da Empresa",      // C
+  "Telefone",             // D
+  "Email",                // E
+  "Instagram",            // F
+  "Website",              // G
+  "Endereço",             // H
+  "Bairro",               // I
+  "Avaliação Google ⭐",  // J
+  "Nº Avaliações",        // K
+  "Link Maps",            // L
+  "Data da Busca",        // M
+  "Observações",          // N
 ];
 
-const LARGURAS = [150, 220, 145, 205, 185, 195, 245, 125, 125, 110, 220, 115, 220];
+const LARGURAS = [150, 160, 220, 145, 205, 185, 195, 245, 125, 125, 110, 220, 115, 220];
 
 // =============================================
 // UTILITARIOS
@@ -561,18 +562,18 @@ async function aplicarFormatacao(sheets, gid) {
 }
 
 async function carregarChavesExistentes(sheets) {
-  // Nova ordem: A=Status, B=Nome, C=Telefone, D=Email, E=Instagram, F=Website, G=Endereço
+  // A=Status, B=CNPJ, C=Nome, D=Tel, E=Email, F=Instagram, G=Website, H=Endereco
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: CONFIG.sheetId,
-    range: `${CONFIG.sheetNome}!A2:G`,
+    range: `${CONFIG.sheetNome}!A2:H`,
   }).catch(() => null);
 
   const chaves = new Set();
   const rows = res?.data?.values || [];
   for (const row of rows) {
-    const nome = row[1] || "";
-    const telefone = row[2] || "";
-    const endereco = row[6] || "";
+    const nome     = row[2] || "";  // C
+    const telefone = row[3] || "";  // D
+    const endereco = row[7] || "";  // H
     if (telefone && telefone !== NAO) chaves.add(telefone.replace(/\D/g, ""));
     if (nome && endereco) chaves.add(`${nome}|${endereco}`);
   }
@@ -582,19 +583,20 @@ async function carregarChavesExistentes(sheets) {
 
 function formatarLinha(lead) {
   return [
-    "Não contatado",
-    val(lead.nome),
-    lead.telefone ? formatarTelefone(lead.telefone) : NAO,
-    val(lead.email),
-    val(lead.instagram),
-    val(lead.website),
-    val(lead.endereco),
-    val(lead.bairro),
-    lead.avaliacao || NAO,
-    lead.reviews || NAO,
-    val(lead.mapsLink),
-    new Date().toLocaleDateString("pt-BR"),
-    "",
+    "Não contatado",        // A Status
+    "",                     // B CNPJ (preenchido pelo enriquecer-leads.js)
+    val(lead.nome),         // C Nome
+    lead.telefone ? formatarTelefone(lead.telefone) : NAO, // D Tel
+    val(lead.email),        // E Email
+    val(lead.instagram),    // F Instagram
+    val(lead.website),      // G Website
+    val(lead.endereco),     // H Endereço
+    val(lead.bairro),       // I Bairro
+    lead.avaliacao || NAO,  // J Avaliação
+    lead.reviews || NAO,    // K Nº Avaliações
+    val(lead.mapsLink),     // L Link Maps
+    new Date().toLocaleDateString("pt-BR"), // M Data
+    "",                     // N Obs
   ];
 }
 
