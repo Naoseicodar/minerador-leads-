@@ -17,7 +17,7 @@ const ENV_FILE     = path.join(__dirname, ".env");
 
 // ── API endpoints ──────────────────────────────────────────────────────────
 
-app.get("/status", (req, res) => {
+app.get(["/zapchat/status", "/status"], (req, res) => {
   try {
     if (!fs.existsSync(STATUS_FILE)) return res.json({ status_bot: "offline" });
     res.json(JSON.parse(fs.readFileSync(STATUS_FILE)));
@@ -26,7 +26,7 @@ app.get("/status", (req, res) => {
   }
 });
 
-app.post("/control", (req, res) => {
+app.post(["/zapchat/control", "/control"], (req, res) => {
   const { acao } = req.body; // pausar | retomar | parar
   const ctrl = { pausado: false, parado: false };
   if (acao === "pausar")  ctrl.pausado = true;
@@ -35,7 +35,7 @@ app.post("/control", (req, res) => {
   res.json({ ok: true, acao });
 });
 
-app.post("/limite", (req, res) => {
+app.post(["/zapchat/limite", "/limite"], (req, res) => {
   const limite = Number(req.body.limite);
   if (!limite || limite < 1 || limite > 500) return res.status(400).json({ erro: "Inválido" });
   let env = fs.readFileSync(ENV_FILE, "utf-8");
@@ -51,7 +51,7 @@ app.post("/limite", (req, res) => {
 
 // ── Dashboard HTML ─────────────────────────────────────────────────────────
 
-app.get("/", (req, res) => res.send(`<!DOCTYPE html>
+app.get(["/zapchat", "/"], (req, res) => res.send(`<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -400,7 +400,7 @@ function atualizarTimer(iniciado) {
 }
 
 async function atualizar() {
-  const r = await fetch('/status').catch(() => null);
+  const r = await fetch('/zapchat/status').catch(() => null);
   if (!r) return;
   const d = await r.json();
 
@@ -477,7 +477,7 @@ async function atualizar() {
 }
 
 async function controlar(acao) {
-  const r = await fetch('/control', {
+  const r = await fetch('/zapchat/control', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ acao })
@@ -499,7 +499,7 @@ function confirmarParar() {
 async function salvarLimite() {
   const val = Number(document.getElementById('inp-limite').value);
   if (!val || val < 1) return;
-  const r = await fetch('/limite', {
+  const r = await fetch('/zapchat/limite', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
     body: JSON.stringify({ limite: val })

@@ -103,46 +103,68 @@ function inferirSubNicho(nome) {
 
 const NICHO_COPY = {
   dentista: {
-    cenario: (bairro) =>
-      `Imagina que agora tem alguém em ${bairro} com dor de dente pesquisando "dentista perto de mim" no Google`,
-    dor: "Essa pessoa não vai encontrar vocês. Sem site, o Google simplesmente ignora a clínica — e ela liga pro concorrente que aparece primeiro.",
-    contexto: "Para dentista, a busca é urgente. O paciente quer resolver agora e escolhe quem aparece primeiro, não necessariamente quem é melhor.",
+    // PAS: dor urgente, custo real, saída clara
+    problema: (bairro) =>
+      `Toda semana alguém em ${bairro} pesquisa "dentista perto de mim" no Google com dor de dente — e escolhe quem aparece primeiro, não necessariamente quem é melhor.`,
+    agitacao: "Sem site, o Google ignora a clínica. O paciente liga pro concorrente que aparece, não para quem tem mais estrelas no Maps. Cada dia são 3, 4 buscas que vão embora.",
+    prova: "Dentistas que adicionaram site com SEO local relatam preencher agenda em 30 dias — só com pacientes que vinham do Google e antes iam pra outro.",
+    abertura_curiosidade: (bairro) =>
+      `Tem um motivo pelo qual clínicas com menos avaliações aparecem antes que vocês nas buscas de "${bairro}"...`,
+    contexto: "Busca urgente — paciente decide em segundos quem ligar. Site no Google é triagem antes do primeiro contato.",
   },
   capilar: {
-    cenario: (bairro) =>
-      `Imagina que alguém pesquisando há semanas sobre implante capilar abre o Google e compara clínicas em ${bairro}`,
-    dor: "Sem site, vocês são eliminados da lista antes mesmo do primeiro contato. Para um serviço de alto valor como esse, o cliente precisa de credibilidade antes de ligar.",
-    contexto: "Implante capilar é decisão de alto ticket — o cliente pesquisa muito. Site é pré-requisito de credibilidade para fechar.",
+    problema: (bairro) =>
+      `Implante capilar é uma decisão de meses. O cliente pesquisa, compara, desconfia — e em ${bairro} ele abre o Google antes de ligar pra qualquer clínica.`,
+    agitacao: "Sem site, vocês são cortados da lista na primeira pesquisa. Serviço de R$5.000, R$10.000 — e o cliente elimina quem não tem presença antes de fazer o primeiro contato.",
+    prova: "Para serviços de alto ticket, a ausência de site reduz a taxa de contato em mais de 60%. O cliente precisa de credibilidade antes de ligar.",
+    abertura_curiosidade: (bairro) =>
+      `Quando alguém pesquisa "implante capilar ${bairro}", quem aparece não é necessariamente quem é melhor — é quem tem site otimizado.`,
+    contexto: "Alto ticket exige credibilidade digital. Site é filtro de seriedade antes do primeiro contato.",
   },
   psicologia: {
-    cenario: (bairro) =>
-      `Imagina que alguém está passando por um momento difícil e pesquisa "psicólogo em ${bairro}" em busca de alguém de confiança`,
-    dor: "Sem site, essa pessoa não sente segurança suficiente para ligar. Para um serviço tão sensível, a primeira impressão é tudo — e ela acontece no Google.",
-    contexto: "Paciente de psicologia busca confiança e discrição. Site profissional é o que transmite isso antes do primeiro contato.",
+    problema: (bairro) =>
+      `Quem busca psicólogo já está vulnerável. A pessoa pesquisa "psicólogo em ${bairro}", abre os primeiros resultados — e escolhe com quem se sente segura antes de ligar.`,
+    agitacao: "Sem site, não tem como transmitir essa segurança. Perfil no Instagram não basta — o paciente quer ver o profissional, a abordagem, sentir confiança antes do primeiro contato.",
+    prova: "Psicólogos com site profissional relatam pacientes que disseram explicitamente: 'li seu site e já me senti à vontade antes de ligar'.",
+    abertura_curiosidade: (bairro) =>
+      `Paciente de psicologia raramente chega por indicação direta — a maioria pesquisa no Google e escolhe quem transmite mais confiança na primeira olhada.`,
+    contexto: "Decisão emocional e sensível. Site profissional é o que transmite confiança antes do primeiro contato.",
   },
   fisioterapia: {
-    cenario: (bairro) =>
-      `Imagina que alguém com dor crônica que não tem indicação abre o Google e pesquisa "fisioterapeuta em ${bairro}"`,
-    dor: "Sem site, vocês não aparecem para quem está buscando ativamente — e esse é um público enorme que não chega por indicação.",
-    contexto: "Fisioterapia ainda depende muito de indicação, mas perde quem pesquisa no Google. São pacientes que ninguém está captando.",
+    problema: (bairro) =>
+      `Em ${bairro}, boa parte dos pacientes de fisioterapia não vem por indicação — vem porque pesquisou no Google com dor e precisava resolver rápido.`,
+    agitacao: "Sem site, esse público inteiro passa por vocês sem saber que existem. São pessoas buscando ativamente, com dor, prontas para marcar — e que vão pro primeiro que aparece.",
+    prova: "Clínicas de fisio que aparecem no Google local captam entre 40% e 60% dos novos pacientes direto de busca — sem anunciar, sem gastar em tráfego pago.",
+    abertura_curiosidade: (bairro) =>
+      `Tem uma fatia de pacientes em ${bairro} que nunca vai chegar por indicação — eles só buscam no Google. E quem não aparece, não existe pra eles.`,
+    contexto: "Canal de busca ativo e subestimado em fisio. Paciente com dor decide rápido por quem aparece primeiro.",
   },
   nutricao: {
-    cenario: (bairro) =>
-      `Imagina que alguém querendo emagrecer e cansado de tentativas pesquisa "nutricionista em ${bairro}" no Google`,
-    dor: "Sem site, vocês não aparecem nesse momento de decisão. E num nicho tão concorrido no Instagram, quem aparece no Google leva uma vantagem enorme.",
-    contexto: "Nutrição é nicho muito competitivo. Instagram tem muito player, mas Google local ainda é pouco explorado — vantagem real.",
+    problema: (bairro) =>
+      `Nutrição é o nicho mais disputado no Instagram. Em ${bairro}, dezenas de nutricionistas postam todo dia — mas quando alguém pesquisa no Google, aparecem só 3 ou 4.`,
+    agitacao: "Sem site, vocês ficam na disputa do Instagram sem aproveitar o Google, que é onde a decisão de contratar acontece. São pacientes que pesquisaram, estavam prontos — e foram pra quem apareceu.",
+    prova: "Nutricionistas com site SEO local recebem consultas de pacientes que não os seguiam no Instagram — vieram direto do Google, sem remarketing, sem anúncio.",
+    abertura_curiosidade: (bairro) =>
+      `No Instagram de ${bairro} tem 50 nutricionistas. No Google tem 4. Quem está nesses 4 não precisa competir — só atender.`,
+    contexto: "Google local = canal sem disputa. Paciente motivado e com decisão formada antes de entrar em contato.",
   },
   estetica: {
-    cenario: (bairro) =>
-      `Imagina que alguém querendo fazer um procedimento estético pesquisa "clínica estética em ${bairro}" no Google`,
-    dor: "Mesmo com um Instagram incrível mostrando resultados, quem não tem site não aparece nessa busca — e vai direto pra concorrência.",
-    contexto: "Clínica estética costuma investir muito no Instagram mas esquece o Google. Quem equilibra os dois capta muito mais.",
+    problema: (bairro) =>
+      `Clínica estética com Instagram impecável, resultados incríveis — mas quando alguém pesquisa "clínica estética em ${bairro}" no Google, não aparece.`,
+    agitacao: "O Instagram converte quem já te conhece. O Google capta quem nunca te viu mas está pronto pra fechar. Sem site, essa segunda metade do mercado vai inteira pro concorrente.",
+    prova: "Clínicas que equilibram Instagram e Google chegam a dobrar o volume de novos clientes — sem aumentar o investimento em anúncios.",
+    abertura_curiosidade: (bairro) =>
+      `Existe uma diferença grande entre quem segue seu Instagram e quem pesquisa no Google "estética ${bairro}". O segundo grupo está pronto pra marcar — e você não aparece pra eles.`,
+    contexto: "Instagram converte seguidores. Google capta desconhecidos prontos pra fechar. Site une os dois.",
   },
   saude: {
-    cenario: (bairro) =>
-      `Imagina que alguém em ${bairro} está precisando exatamente do serviço que vocês oferecem e abre o Google pra buscar`,
-    dor: "Sem site, esse paciente não vai encontrar vocês. O Google prioriza quem tem site otimizado — e o cliente vai direto pra quem aparece primeiro.",
-    contexto: "Na área da saúde, a decisão começa no Google. Quem não aparece lá simplesmente não existe para esse cliente.",
+    problema: (bairro) =>
+      `Em ${bairro}, toda semana tem alguém pesquisando exatamente o serviço que vocês oferecem no Google — e indo pro concorrente porque não encontrou vocês.`,
+    agitacao: "Sem site, o Google simplesmente não te indexa. O Maps ajuda, mas não basta. Quem aparece nas buscas tem site otimizado — e capta o paciente antes de você saber que ele existia.",
+    prova: "Na área da saúde, mais de 70% dos novos pacientes fazem busca online antes de ligar. Quem não aparece nessa pesquisa não entra na consideração.",
+    abertura_curiosidade: (bairro) =>
+      `Tem pacientes em ${bairro} que precisam exatamente do que vocês oferecem — mas que nunca vão ligar porque não sabem que vocês existem.`,
+    contexto: "Decisão começa no Google. Quem não aparece nas buscas locais não existe para esse paciente.",
   },
 };
 
@@ -160,36 +182,55 @@ async function gerarMensagem(lead) {
     ? `Vi que a ${nome} tem ${reviews} avaliações no Google Maps.`
     : `Vi a ${nome} no Google Maps.`;
 
-  const prompt = `Você é ${CONFIG.vendedor.nome}, especialista em criação de sites com foco em SEO e posicionamento no Google para negócios de saúde. Você entrega sites prontos em menos de 48 horas.
+  // Escolhe framework aleatório para variar as mensagens
+  const frameworks = ["PAS", "PPPP", "CURIOSIDADE_PAS"];
+  const framework = frameworks[Math.floor(Math.random() * frameworks.length)];
 
-Escreva uma DM personalizada no Instagram para este negócio seguindo EXATAMENTE a estrutura AIDA abaixo.
+  const estruturas = {
+    PAS: `ESTRUTURA: PAS (Problem → Agitate → Solution)
+1. ABERTURA PESSOAL — Apresente-se de forma casual: nome + especialidade. Uma frase, sem exagero.
+2. PROBLEMA — Use este contexto: "${copy.problema(bairro || "sua região")}" — seja direto, sem rodeio.
+3. AGITAÇÃO — Aprofunde a dor com números ou consequência real: "${copy.agitacao}" Uma frase que dói um pouco.
+4. SOLUÇÃO — Apresente de forma leve: site otimizado para Google local, pronto em 48h. Sem pitch, sem preço.
+5. CTA — Uma pergunta de baixíssimo compromisso. Varie: "Posso te mostrar como ficaria?" / "Quer ver como apareceria no Google?" / "Faz sentido eu te explicar como funciona?"`,
+
+    PPPP: `ESTRUTURA: PPPP (Picture → Promise → Prove → Push)
+1. PICTURE — Coloque o empresário dentro da cena: "${copy.problema(bairro || "sua região")}" — vívido, específico, real.
+2. PROMISE — O que muda com um site: aparecer no Google local, captar quem está buscando agora. Uma frase.
+3. PROVE — Use este dado: "${copy.prova}" — torna a promessa crível sem exagerar.
+4. PUSH — Uma pergunta suave que abre conversa: "Posso te mostrar como ficaria pra ${nome}?" ou variação natural.
+5. ASSINATURA — Apresente-se ao final: "Sou ${CONFIG.vendedor.nome}, especialista em sites para saúde."`,
+
+    CURIOSIDADE_PAS: `ESTRUTURA: Abertura com curiosidade + PAS
+1. GANCHO — Comece com: "${copy.abertura_curiosidade(bairro || "sua região")}" — não revele a resposta ainda.
+2. APRESENTAÇÃO — Uma frase casual: quem você é e o que faz.
+3. PROBLEMA + AGITAÇÃO — Una os dois em 2 frases curtas usando: "${copy.agitacao}"
+4. SOLUÇÃO — Site SEO local, pronto em 48h. Leve, sem pressão.
+5. CTA — Pergunta de abertura: "Quer que eu explique como funciona?" ou variação.`,
+  };
+
+  const prompt = `Você é ${CONFIG.vendedor.nome}, especialista em criação de sites com foco em SEO e posicionamento no Google para negócios de saúde. Entrega em menos de 48 horas.
+
+Escreva uma DM personalizada no Instagram para este negócio.
 
 DADOS DO LEAD:
 - Empresa: ${nome}
 - Sub-nicho: ${subNicho}
 - Localização: ${bairro || "região local"}
 - Reputação: ${rep}
-- Contexto de nicho: ${copy.contexto}
+- Contexto estratégico: ${copy.contexto}
 
-ESTRUTURA OBRIGATÓRIA (nessa ordem):
+${estruturas[framework]}
 
-1. AUTORIDADE — Apresente-se: "Oi [nome da empresa]! Me chamo ${CONFIG.vendedor.nome}, sou especialista em sites e SEO para negócios de saúde." Varie o modo de dizer mas mantenha nome + especialidade + nicho saúde.
-
-2. ATENÇÃO — Use este cenário adaptado: "${cenario}..." Crie a cena de forma vívida, coloque o empresário na cabeça do cliente dele.
-
-3. INTERESSE — Use esta dor: "${copy.dor}" Mostre que ele está perdendo paciente agora, nesse momento.
-
-4. DESEJO — Apresente a solução de forma leve: site otimizado para o Google da região, pronto em menos de 48h. Não cite preço. Não faça pitch agressivo.
-
-5. AÇÃO — Termine com UMA pergunta de baixíssimo compromisso. Exemplos do estilo certo: "Posso te mostrar como ficaria pra [nome]?" / "Quer ver um exemplo de como apareceria no Google?" / "Faz sentido eu te mostrar como funciona?" — varie, nunca repita a mesma.
-
-REGRAS:
-- Tom: direto, confiante, humano — NUNCA corporativo ou robótico
-- Máximo 5 parágrafos curtos
-- Zero emojis ou no máximo 1 se encaixar naturalmente
-- Escreva em português brasileiro informal mas profissional
-- Varie a estrutura de frase — nunca comece dois parágrafos da mesma forma
-- NÃO cite preço na primeira mensagem
+REGRAS ABSOLUTAS:
+- Tom: humano, direto, confiante — como se fosse mensagem de colega de área, não de vendedor
+- Máximo 5 parágrafos curtos (2-3 frases cada)
+- Zero emojis
+- Português brasileiro informal mas profissional
+- NUNCA use: "alavancar", "potencializar", "solução completa", "no cenário atual", "aumentar sua visibilidade"
+- NUNCA cite preço
+- NUNCA faça lista com bullet points
+- Varie estrutura de frase — nunca comece dois parágrafos igual
 - Gere APENAS o texto da mensagem, sem aspas, sem título, sem explicação`;
 
   const response = await anthropic.messages.create({

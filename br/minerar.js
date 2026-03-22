@@ -142,9 +142,9 @@ const CIDADES_PARANA = [
 ];
 
 const CONFIG = {
-  credenciaisPath: path.join(__dirname, "credentials.json"),
+  credenciaisPath: path.join(__dirname, "../credentials.json"),
   sheetId: process.env.SHEET_ID || "1IZTRE-aYZ1kfMe04fClHWc0JUShlQJxgp51I2_JsKlI",
-  sheetNome: "Leads",
+  sheetNome: "leads-Br",
 
   termo: process.env.TERMO || "",
 

@@ -8,7 +8,7 @@ const sender = new EmailSender({
     }
 });
 
-console.log("=== DISPARO PORTUGAL — Nox Tech ===\n");
+console.log("=== MinerADOR PRO — Disparo Portugal ===\n");
 
 sender.start().then(() => {
     console.log("\nDisparo concluido.");

@@ -6,7 +6,7 @@
 
 require("dotenv").config();
 const { Client, LocalAuth, RemoteAuth, MessageMedia } = require("whatsapp-web.js");
-const { SupabaseStore } = require("./supabase-store");
+const { SupabaseStore } = require("../supabase-store");
 const Anthropic = require("@anthropic-ai/sdk");
 const OpenAI = require("openai");
 const { google } = require("googleapis");
@@ -16,7 +16,7 @@ const fs = require("fs");
 // No Render: decodifica credentials.json a partir de variavel de ambiente
 if (process.env.GOOGLE_CREDENTIALS_B64 && !fs.existsSync(path.join(__dirname, "credentials.json"))) {
   fs.writeFileSync(
-    path.join(__dirname, "credentials.json"),
+    path.join(__dirname, "..", "credentials.json"),
     Buffer.from(process.env.GOOGLE_CREDENTIALS_B64, "base64")
   );
 }
@@ -29,7 +29,7 @@ const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPE
 const CONFIG = {
   anthropicKey: process.env.ANTHROPIC_API_KEY,
 
-  credenciaisPath: path.join(__dirname, "credentials.json"),
+  credenciaisPath: path.join(__dirname, "..", "credentials.json"),
   sheetId: process.env.SHEET_ID || "1IZTRE-aYZ1kfMe04fClHWc0JUShlQJxgp51I2_JsKlI",
   sheetNome: "leads-Br",
 
@@ -50,7 +50,7 @@ const CONFIG = {
   // Áudio padrão — coloque o arquivo na pasta do projeto
   // Formatos aceitos: .ogg, .mp3, .m4a, .wav
   // Se o arquivo não existir, envia mensagem de texto normalmente
-  audioPath: path.join(__dirname, "audio-padrao.ogg"),
+  audioPath: path.join(__dirname, "..", "audio-padrao.ogg"),
 
   // ── DELAYS HUMANOS (ms) ────────────────────────────────────────────
   leitura:    { min: 3000,   max: 8000   },  // "lendo" o chat antes de digitar
@@ -125,8 +125,8 @@ const FOLLOWUP_MSGS = [
 // =============================================
 // STATUS — Dashboard
 // =============================================
-const statusPath  = path.join(__dirname, "status.json");
-const controlPath = path.join(__dirname, "control.json");
+const statusPath  = path.join(__dirname, "..", "status.json");
+const controlPath = path.join(__dirname, "..", "control.json");
 
 const statusData = {
   status_bot: "iniciando",
@@ -444,7 +444,7 @@ async function transcreverAudio(base64data, mimetype) {
     return null;
   }
   const ext = mimetype.includes("ogg") ? "ogg" : mimetype.includes("mp4") ? "mp4" : "mp3";
-  const tempFile = path.join(__dirname, `_audio_tmp_${Date.now()}.${ext}`);
+  const tempFile = path.join(__dirname, "..", `_audio_tmp_${Date.now()}.${ext}`);
   try {
     fs.writeFileSync(tempFile, Buffer.from(base64data, "base64"));
     const resp = await openai.audio.transcriptions.create({
@@ -637,7 +637,7 @@ Responda SOMENTE com JSON válido:
 function temAudio() {
   // Tenta extensões alternativas se audio-padrao.ogg não existir
   const extensoes = [".ogg", ".mp3", ".m4a", ".wav"];
-  const base = path.join(__dirname, "audio-padrao");
+  const base = path.join(__dirname, "..", "audio-padrao");
   for (const ext of extensoes) {
     if (fs.existsSync(base + ext)) {
       CONFIG.audioPath = base + ext;

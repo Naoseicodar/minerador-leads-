@@ -418,10 +418,17 @@ class MinerEngine {
                 diagnostico = falhas.length > 0 ? falhas.join(" | ") : "✅ Site bem otimizado tecnicamente";
 
                 // Extração de Emails
-                const emailMatches = html.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi);
-                if (emailMatches && emailMatches.length > 0) {
-                    email = emailMatches[0];
-                }
+                const DOMINIOS_INVALIDOS = [
+                    "sentry.io", "ingest.sentry.io", "sentry-next.wixpress.com",
+                    "wixpress.com", "example.com", "test.com", "domain.com",
+                    "email.com", "yoursite.com", "site.com", "2x.png", "1x.png"
+                ];
+                const emailMatches = html.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi) || [];
+                const emailValido = emailMatches.find(e => {
+                    const lower = e.toLowerCase();
+                    return !DOMINIOS_INVALIDOS.some(d => lower.includes(d));
+                });
+                if (emailValido) email = emailValido;
                 social = (html.match(/https?:\/\/(www\.)?(facebook\.com|instagram\.com)\/[A-Za-z0-9_.]+/i) || [])[0] || null;
             }
             return { email, social, diagnostico };
